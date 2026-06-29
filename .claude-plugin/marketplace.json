@@ -7,7 +7,21 @@
   "plugins": [
     {
       "name": "somnio-loop",
-      "source": "."
+      "source": "./",
+      "description": "Autonomous agentic loop plugin: ticket in, deliverable out. Multi-archetype triage, ADR generation, self-healing code loops, tech-agnostic discovery, MCP integrations.",
+      "version": "0.7.0",
+      "license": "MIT",
+      "homepage": "https://github.com/giosomniodev/somnio-loop",
+      "repository": "https://github.com/giosomniodev/somnio-loop",
+      "keywords": [
+        "agent",
+        "loop-engineering",
+        "orchestrator-workers",
+        "self-healing",
+        "adr",
+        "autonomous"
+      ]
     }
   ]
 }
+
