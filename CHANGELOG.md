@@ -2,6 +2,51 @@
 
 All notable changes to `somnio-loop` are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/) and the project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.9.0] — 2026-06-29 — Three presets (minimal / ownership / custom) + resilience layer
+
+### Changed (BREAKING)
+
+- **Presets reduced from four to three.** `balanced` and `high` are REMOVED. The new three are:
+  - `minimal` — total autonomy. Only stops for hard safety floor (rule violations, hotfix).
+  - `ownership` — human owns architectural + risk decisions (ADR conflicts, self-healing exhaust, PR creation). Plugin owns routine execution. ~3–5 interactions per typical run.
+  - `custom` — full per-gate control. ALL gates must be defined (partial custom rejected at boot).
+
+### Added
+
+- **Resilience layer at Phase -1** (v0.9.0). Config drift can't silently break the plugin. Validated at boot:
+  - Unknown preset name → aborts with allowed list.
+  - Unknown gate name → warning + ignored (allows graceful renames).
+  - Invalid enum value → aborts with allowed values printed.
+  - Out-of-range integer → aborts with allowed range (e.g. `auto_fix_max_retries` cap at 5, `max_questions` cap at 20).
+  - Safety-floor violation (`adr_rule_violation_gate.on_violation: proceed`) → aborts. Documented rules never bypassed.
+  - `preset: custom` with missing gates → aborts with the missing gate names.
+- **9 customizable gates documented** with allowed values in `references/autonomy-config.md` + README. Each gate now has explicit safety-floor annotations.
+- **Chat surface line for autonomy** (Phase 0b enhanced): summary of what the resolved preset means (e.g. `Gates: ADR conflicts + self-healing exhaust + PR creation → ask; everything else proceeds`).
+
+### Migration from v0.8.x
+
+Manual — this is the only breaking change:
+
+| v0.8.x preset | v0.9.0 equivalent | Notes |
+|---|---|---|
+| `minimal` | `minimal` | Same, no change |
+| `balanced` (default) | `ownership` | Roughly equivalent; ownership asks on architectural moments only |
+| `high` | `ownership` + `custom` overrides | For per-write approvals, define `custom` with `pr_creation_gate.on_ready: ask` etc. |
+| `custom` | `custom` | Must now define ALL gates (partial rejected). |
+
+Update `.loop/config.yaml`:
+
+```yaml
+# Was (v0.8.x): preset: balanced
+# Now (v0.9.0):
+autonomy:
+  preset: ownership
+```
+
+If you had `custom` with only a few gates defined, either:
+1. Move to `minimal` or `ownership` if the preset defaults now suit you
+2. Define ALL 9 gates explicitly in `custom`
+
 ## [0.8.2] — 2026-06-29 — Minimal config + observability always-on
 
 ### Changed

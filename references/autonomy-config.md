@@ -4,16 +4,19 @@ Lives at `<repo_root>/.loop/config.yaml`. Created from template on first run. Ed
 
 > v0.6.0 added the `mcp_integrations` section + 3 new gates (`ticket_status_update_gate`, `pr_creation_gate`, `notification_gate`). See `references/mcp-integrations.md` for the schema and adapter patterns. This document covers only the autonomy/gates portion.
 
-## TL;DR
+## TL;DR (v0.9.0)
 
-- `autonomy.preset` is the ONLY dial you usually need. Three values cover 99% of cases: `minimal` (autonomous), `balanced` (safe default), `high` (max friction). Plus `custom` for fine control.
-- **Presets are self-contained (v0.8.2).** Setting `preset: minimal` implies ALL gate defaults for minimal. You do NOT need to spell out each gate — the preset knows.
-- 6 named gates exist internally but you only touch them when using `preset: custom`.
-- Observability is ALWAYS ON regardless of preset — surfacing lines, per-agent consumption table, run-report, STATE updates. Not configurable, always present.
+- `autonomy.preset` is the ONLY dial you usually need. **Three values**:
+  - `minimal` — total autonomy. Plugin only stops for hard safety floor (rule violations, hotfix confirmation).
+  - `ownership` — human owns architectural and risk decisions; plugin owns routine execution.
+  - `custom` — you spell out each gate. Requires ALL gates to be defined explicitly (no partial custom).
+- **Presets are self-contained.** Setting `preset: minimal` implies all gate defaults for minimal. You do NOT need to spell out each gate.
+- Observability is ALWAYS ON — surfacing lines, per-agent consumption table, run-report, STATE updates. Not a gate. Not configurable.
 - Override per-run via the ticket text: `do "ticket... --autonomy=minimal"`.
+- **Resilience (v0.9.0):** invalid presets, unknown gates, and forbidden values are rejected at Phase -1 with a clear error message. Config drift can't silently break the plugin.
 - 4 hard rules NEVER bend regardless of config: no auto-merge PRs, no push to main, no touching denylist paths, no overriding documented `.rules` violations silently.
 
-## Minimal viable config (v0.8.2)
+## Minimal viable config
 
 If your project uses Jira + GitHub, this 10-line config is complete:
 
@@ -34,31 +37,231 @@ mcp_integrations:
     base_branch: "develop"
 ```
 
-That's it. The `preset: minimal` line implies all six gate defaults (proceed / auto_fix / use_defaults_and_flag / etc.). MCP fields describe your project. Observability is on by default.
+Change `preset: minimal` to `ownership` if you want to be consulted on architectural and risk decisions.
 
-If you want the safer default behavior instead, change `preset: minimal` to `preset: balanced` (or omit it entirely — balanced is the built-in default).
+## Preset expansion table (v0.9.0)
 
-## Preset self-contained defaults
+Setting `preset: <name>` implies these gate values internally. You do NOT need to write them out.
 
-Setting `preset: <name>` implies these gate values. You do NOT need to write them out.
-
-| Gate | `minimal` | `balanced` (default) | `high` |
+| Gate | `minimal` | `ownership` | `custom` |
 |---|---|---|---|
-| `budget_gate.on_exceed` | `proceed` | `ask` | `ask` |
-| `budget_gate.threshold_usd` | 5.00 | 1.50 | 0.50 |
-| `verifier_blocking_gate.on_blocking` | `auto_fix` (max 2 retries) | `ask` | `ask` |
-| `adr_conflict_gate.on_high_conflict` | `proceed_with_record` | `ask` | `ask` |
-| `adr_rule_violation_gate.on_violation` | `ask` (safety floor) | `ask` | `ask` |
-| `spec_clarification_gate.on_gaps` | `use_defaults_and_flag` | `ask` (max 5) | `ask` (max 10) |
-| `spec_clarification_gate.max_questions` | 0 | 5 | 10 |
-| `self_healing_exhaust_gate.on_exhausted` | `escalate_silent` | `ask` | `ask` |
-| `ticket_status_update_gate.on_complete` | `proceed` | `ask` | `ask` |
-| `pr_creation_gate.on_ready` | `proceed` (draft only) | `ask` | `ask` |
-| `notification_gate.enabled` | `false` (opt-in) | `false` | `false` |
-| Approval before every write | no | no | **yes** |
-| "Continue?" after each phase | no | no | **yes** |
+| `budget_gate.on_exceed` | `proceed` | `ask` (only if >2× threshold) | *(user-defined)* |
+| `budget_gate.threshold_usd` | 5.00 | 2.00 | *(user-defined)* |
+| `verifier_blocking_gate.on_blocking` | `auto_fix` (2 retries) | `auto_fix` (2 retries) | *(user-defined)* |
+| `adr_conflict_gate.on_high_conflict` | `proceed_with_record` | **`ask`** | *(user-defined)* |
+| `adr_rule_violation_gate.on_violation` | `ask` (safety floor — NEVER proceed) | `ask` (safety floor) | `ask` \| `abort` only |
+| `spec_clarification_gate.on_gaps` | `use_defaults_and_flag` | `use_defaults_and_flag` | *(user-defined)* |
+| `spec_clarification_gate.max_questions` | 0 | 0 | *(user-defined)* |
+| `self_healing_exhaust_gate.on_exhausted` | `escalate_silent` | **`ask`** | *(user-defined)* |
+| `ticket_status_update_gate.on_complete` | `proceed` | `proceed` | *(user-defined)* |
+| `pr_creation_gate.on_ready` | `proceed` (draft only) | **`ask`** | *(user-defined)* |
+| `notification_gate.enabled` | `false` | `false` | *(user-defined)* |
+| Approval before every write | no | no | no |
+| Hotfix confirmation | **`ask`** (safety floor) | **`ask`** (safety floor) | **`ask`** (safety floor) |
 
-Override individually only with `preset: custom` (see below).
+### What `ownership` means
+
+Human owns:
+- **Architectural decisions** — ADR PR/MR conflicts (`adr_conflict_gate: ask`)
+- **Work convergence** — when self-healing can't converge after retries (`self_healing_exhaust_gate: ask`)
+- **Delivery moments** — when PR is ready to be created (`pr_creation_gate: ask`)
+- **Rule violations & hotfix** — safety floor, non-negotiable
+
+Plugin owns:
+- Small budget deltas
+- Verifier auto-fix for lint/type/test failures
+- Spec gaps (marked TBD, not asked)
+- Ticket status updates
+- Small execution decisions
+
+Result: about 3–5 interactions per typical development ticket, at the architecturally-important moments. Compared to `minimal` (0–1 interactions) and old `balanced` (10+ interactions).
+
+## Customizable gates for `preset: custom`
+
+If you set `preset: custom`, you MUST define every gate explicitly. Partial custom configs are rejected at Phase -1. Below is the complete list of gates + their allowed values.
+
+### `budget_gate`
+
+Controls behavior when the plan estimates spending more than the threshold.
+
+```yaml
+budget_gate:
+  enabled: true                    # true | false
+  threshold_tokens: 200000         # any positive integer
+  threshold_usd: 1.50              # any positive float
+  on_exceed: ask                   # ask | proceed | abort
+```
+
+| Field | Type | Allowed values |
+|---|---|---|
+| `enabled` | boolean | `true`, `false` |
+| `threshold_tokens` | integer | > 0 |
+| `threshold_usd` | float | > 0 |
+| `on_exceed` | enum | `ask`, `proceed`, `abort` |
+
+### `verifier_blocking_gate`
+
+Controls behavior when the verifier reports blocking findings after intermediate artifacts are audited.
+
+```yaml
+verifier_blocking_gate:
+  enabled: true
+  on_blocking: auto_fix
+  auto_fix_max_retries: 2
+```
+
+| Field | Type | Allowed values |
+|---|---|---|
+| `enabled` | boolean | `true`, `false` |
+| `on_blocking` | enum | `ask`, `auto_fix`, `proceed_with_warnings`, `abort` |
+| `auto_fix_max_retries` | integer | 0–5 (values >5 rejected — infinite loop risk) |
+
+### `adr_conflict_gate`
+
+Controls behavior when the ADR generator detects HIGH-overlap conflicts with open PRs/MRs.
+
+```yaml
+adr_conflict_gate:
+  enabled: true
+  on_high_conflict: ask
+```
+
+| Field | Type | Allowed values |
+|---|---|---|
+| `enabled` | boolean | `true`, `false` |
+| `on_high_conflict` | enum | `ask`, `proceed_with_record`, `abort` |
+
+### `adr_rule_violation_gate` (safety floor)
+
+Controls behavior when the ticket proposes an alternative that violates a rule documented in `.cursorrules` / `AGENTS.md` / `.clinerules` etc.
+
+```yaml
+adr_rule_violation_gate:
+  enabled: true
+  on_violation: ask
+```
+
+| Field | Type | Allowed values |
+|---|---|---|
+| `enabled` | boolean | `true`, `false` |
+| `on_violation` | enum | `ask`, `abort` — **`proceed` is REJECTED** by the resilience layer. Documented rules can never be silently bypassed. |
+
+### `spec_clarification_gate`
+
+Controls behavior when the spec-refiner finds gaps that need clarification.
+
+```yaml
+spec_clarification_gate:
+  enabled: true
+  on_gaps: use_defaults_and_flag
+  max_questions: 0
+```
+
+| Field | Type | Allowed values |
+|---|---|---|
+| `enabled` | boolean | `true`, `false` |
+| `on_gaps` | enum | `ask`, `use_defaults_and_flag`, `abort` |
+| `max_questions` | integer | 0–20 (values >20 rejected — friction cap) |
+
+### `self_healing_exhaust_gate`
+
+Controls behavior when a worker exhausts its retry budget without converging.
+
+```yaml
+self_healing_exhaust_gate:
+  enabled: true
+  on_exhausted: escalate_silent
+```
+
+| Field | Type | Allowed values |
+|---|---|---|
+| `enabled` | boolean | `true`, `false` |
+| `on_exhausted` | enum | `ask`, `escalate_silent`, `abort` |
+
+### `ticket_status_update_gate`
+
+Controls behavior when the run completes and the MCP-connected ticket source can be updated.
+
+```yaml
+ticket_status_update_gate:
+  enabled: true
+  on_complete: proceed
+```
+
+| Field | Type | Allowed values |
+|---|---|---|
+| `enabled` | boolean | `true`, `false` |
+| `on_complete` | enum | `ask`, `proceed`, `proceed_with_record`, `skip` |
+
+### `pr_creation_gate`
+
+Controls behavior when the plugin is ready to create a PR via the MCP-connected git host.
+
+```yaml
+pr_creation_gate:
+  enabled: true
+  on_ready: ask
+```
+
+| Field | Type | Allowed values |
+|---|---|---|
+| `enabled` | boolean | `true`, `false` |
+| `on_ready` | enum | `ask`, `proceed` (always draft), `skip` |
+
+### `notification_gate`
+
+Controls whether to post run summaries to Slack/Teams/Discord.
+
+```yaml
+notification_gate:
+  enabled: false
+  on_complete: skip
+```
+
+| Field | Type | Allowed values |
+|---|---|---|
+| `enabled` | boolean | `true`, `false` |
+| `on_complete` | enum | `proceed`, `skip` |
+
+## Resilience layer (v0.9.0)
+
+At Phase -1, before any dispatch, the plugin validates the config:
+
+### Rejected at boot
+
+- Unknown preset name (typos like `minimial`, `owenership`) → error: *"Unknown preset '<name>'. Allowed: minimal | ownership | custom."*
+- Unknown gate name (typos like `budgt_gate`, `verifier_gate`) → warning + ignored (not fatal, so you can rename gracefully).
+- Invalid gate value:
+  - Not in the enum → error: *"gate '<name>' field '<field>' has invalid value '<value>'. Allowed: <enum list>."*
+  - Out of range (retries, questions) → error: *"gate '<name>' field '<field>' value '<n>' out of allowed range (0–<max>)."*
+- Safety-floor violation:
+  - `adr_rule_violation_gate.on_violation: proceed` → error: *"Documented rules cannot be silently bypassed. Use 'ask' or 'abort'."*
+  - Hotfix confirmation set to anything but `ask` in preset expansion → error.
+
+### Partial custom rejected
+
+If `preset: custom`, ALL gates must be defined in the config. Missing any → error: *"preset 'custom' requires explicit definition of gates: [list of missing]. Either define them or use preset 'minimal' | 'ownership'."*
+
+### Config surfacing
+
+At Phase 0b, alongside the four observability lines, print a fifth line summarizing autonomy:
+
+```
+🎛 Autonomy: <preset> (<source>). Gates: <human summary>
+```
+
+For non-custom presets:
+```
+🎛 Autonomy: minimal (default from .loop/config.yaml). Gates: all proceed except safety floor.
+🎛 Autonomy: ownership (default from .loop/config.yaml). Gates: ADR conflicts + self-healing exhaust + PR creation → ask; everything else proceeds.
+```
+
+For custom:
+```
+🎛 Autonomy: custom (default from .loop/config.yaml). Non-default gates: verifier=auto_fix(3 retries), spec_clarification=ask(3), pr_creation=proceed.
+```
+
+This makes it impossible for a config to silently drift into unexpected behavior. If the plugin doesn't like your config, it says so immediately.
 
 ## Schema
 

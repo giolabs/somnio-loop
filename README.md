@@ -3,7 +3,7 @@
 > **Ticket in. Deliverable out.** Autonomous agentic loop orchestration for Claude Code — research, docs, code, or architecture decisions, in any stack.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-0.8.2-3ee8c5)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-0.9.0-3ee8c5)](CHANGELOG.md)
 [![Validate](https://github.com/giosomniodev/somnio-loop/actions/workflows/validate.yml/badge.svg)](https://github.com/giosomniodev/somnio-loop/actions/workflows/validate.yml)
 
 ---
@@ -90,28 +90,70 @@ mcp_integrations:
     base_branch: "develop"
 ```
 
-10 lines. That's it. **You never have to spell out gate values.** The plugin knows what `minimal` / `balanced` / `high` mean and expands them internally.
+10 lines. That's it. **You never have to spell out gate values.** The plugin knows what `minimal` / `ownership` mean and expands them internally.
 
 Observability (surface lines, per-agent consumption table, run-report, STATE updates) is **always on** — not a gate you configure. Every run leaves an audit trail regardless of preset.
 
-## Autonomy presets
+## Autonomy presets (v0.9.0)
 
-Configurable per-project in `.loop/config.yaml` (one line) or per-run via `--autonomy=<preset>` appended to the ticket.
+Three presets. Set one line in `.loop/config.yaml` or override per-run with `--autonomy=<preset>`.
 
 | Preset | Behavior | Use when |
 |---|---|---|
-| `minimal` | Maximum autonomy. Verifier auto-fix up to 2 retries. PR conflicts logged and continued. Spec clarifications marked TBD instead of asking. Status updates posted without confirmation. | Repetitive tickets, batch jobs, after a calibration period. |
-| `balanced` *(default)* | Asks when human judgment adds value, proceeds when it doesn't. The behavior shipped through v0.4.x. | First weeks in any new project or ticket archetype. |
-| `high` | Approval gate before every write. Up to 10 clarification questions. "Continue?" after each phase. | Sensitive areas — auth, billing, production infra, regulatory compliance. |
-| `custom` | Per-gate override. | When presets don't fit your specific risk profile. |
+| `minimal` | Total autonomy. Plugin only stops for hard safety floor (rule violations, hotfix). 0–1 interactions per run. | Repetitive tickets after calibration; batch jobs; tickets with exhaustive AC. |
+| `ownership` | Human owns architectural + risk decisions (ADR conflicts, self-healing exhaust, PR creation). Plugin owns routine execution. ~3–5 interactions per run. | Sensitive areas; new project or team members not yet calibrated. |
+| `custom` | You spell out every gate. ALL gates must be defined (partial configs rejected at boot). | When presets don't fit your specific risk profile. |
 
 ```bash
 # Override per ticket
 do "Migrate auth to Riverpod 2 --autonomy=minimal"
-do "Change pricing engine --autonomy=high"
+do "Refactor payment engine --autonomy=ownership"
 ```
 
-Six configurable gates: `budget_gate`, `verifier_blocking_gate`, `adr_conflict_gate`, `adr_rule_violation_gate`, `spec_clarification_gate`, `self_healing_exhaust_gate`. Full schema in [`references/autonomy-config.md`](references/autonomy-config.md).
+## Customizable gates (`preset: custom`)
+
+Nine gates you can configure. Each has an enum of allowed values enforced by the resilience layer — invalid values are rejected at Phase -1 with a clear error.
+
+| Gate | Field | Allowed values | Safety floor |
+|---|---|---|---|
+| `budget_gate` | `on_exceed` | `ask`, `proceed`, `abort` | — |
+| | `threshold_usd` | float > 0 | — |
+| | `threshold_tokens` | int > 0 | — |
+| `verifier_blocking_gate` | `on_blocking` | `ask`, `auto_fix`, `proceed_with_warnings`, `abort` | — |
+| | `auto_fix_max_retries` | 0–5 | max 5 (infinite loop prevention) |
+| `adr_conflict_gate` | `on_high_conflict` | `ask`, `proceed_with_record`, `abort` | — |
+| **`adr_rule_violation_gate`** | `on_violation` | `ask`, `abort` | **`proceed` is REJECTED** — documented rules can never be silently bypassed |
+| `spec_clarification_gate` | `on_gaps` | `ask`, `use_defaults_and_flag`, `abort` | — |
+| | `max_questions` | 0–20 | max 20 (friction cap) |
+| `self_healing_exhaust_gate` | `on_exhausted` | `ask`, `escalate_silent`, `abort` | — |
+| `ticket_status_update_gate` | `on_complete` | `ask`, `proceed`, `proceed_with_record`, `skip` | Status max = "In Review" (never "Done") |
+| `pr_creation_gate` | `on_ready` | `ask`, `proceed` (always draft), `skip` | Draft-only, non-negotiable |
+| `notification_gate` | `enabled` | `true`, `false` | — |
+| | `on_complete` | `proceed`, `skip` | — |
+| **`hotfix_confirmation_gate`** | (built-in) | Always `ask` | Non-configurable — hotfix always requires explicit approval |
+
+Full field schemas (types, defaults, examples): [`references/autonomy-config.md`](references/autonomy-config.md).
+
+## Resilience layer (v0.9.0)
+
+The plugin validates `.loop/config.yaml` at boot (Phase -1). Config drift can't silently break things.
+
+| Error | Behavior |
+|---|---|
+| Unknown preset (e.g. typo `minimial`) | Aborts with `Unknown preset '<name>'. Allowed: minimal | ownership | custom.` |
+| Unknown gate name | Warning + ignored (graceful — allows rename) |
+| Invalid enum value | Aborts with `gate '<name>' field '<field>' has invalid value '<value>'. Allowed: <list>.` |
+| Out-of-range integer | Aborts with `field '<field>' value '<n>' out of range (0–<max>).` |
+| `adr_rule_violation_gate.on_violation: proceed` | Aborts — safety floor violation |
+| `preset: custom` with missing gates | Aborts with `preset 'custom' requires ALL gates defined. Missing: <list>.` |
+
+At Phase 0b, the plugin surfaces the resolved autonomy in the chat so you always know what stance is active:
+
+```
+🎛 Autonomy: minimal (default from .loop/config.yaml). Gates: all proceed except safety floor.
+🎛 Autonomy: ownership (default from .loop/config.yaml). Gates: ADR conflicts + self-healing exhaust + PR creation → ask; everything else proceeds.
+🎛 Autonomy: custom (default from .loop/config.yaml). Non-default gates: verifier=auto_fix(3 retries), spec_clarification=ask(3).
+```
 
 ## Optional MCP integrations
 
