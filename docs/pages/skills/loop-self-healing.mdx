@@ -1,0 +1,58 @@
+# loop-self-healing
+
+## Overview
+
+`loop-self-healing` implements the write → verify → re-dispatch cycle for code deliverables. Each worker writes in an isolated `git worktree`, the runtime runs the project's own verification commands after every wave, and any failure triggers a targeted corrective dispatch — only for the file the error points to, with the full stderr as context.
+
+## When to use
+
+Triage selects this archetype when a phase needs to implement files with executable acceptance criteria (§8 of the spec names the verification commands). It is language-agnostic: commands come from the project's own task runner, not from hardcoded assumptions. Not suitable for prose deliverables.
+
+## Inputs
+
+A phase spec block from `plan.yml`:
+
+```yaml
+phase: implement
+archetype: self-healing
+spec_path: <repo_root>/.planning/phases/<slug>/spec.md
+api_contract_path: <repo_root>/.planning/phases/<slug>/api-contract.md
+repo_root: <absolute path>
+files:
+  - path: src/utils/rate-limiter.ts
+    action: NUEVO
+    follow_example: src/utils/logger.ts
+    worker_id: w1
+  - path: src/middleware/rate-limit.ts
+    action: NUEVO
+    follow_example: src/middleware/auth.ts
+    worker_id: w2
+verification_commands:
+  - cmd: "npm run typecheck"
+    label: typecheck
+  - cmd: "npm test -- --testPathPattern=rate"
+    label: tests
+max_retries_per_file: 3
+```
+
+## Outputs
+
+| Output | Location |
+|---|---|
+| Implemented files | Branch `loop/<ticket_id>` (never pushed) |
+| Self-healing report | `<run_dir>/self-healing-report.md` |
+
+The report includes a verification matrix showing the status of each command per corrective round, per-file retry counts, and worktree cleanup status.
+
+## Example
+
+```bash
+# Triage selects self-healing for:
+# "Implement rate limiting middleware — 100 req/min per API key"
+#
+# Wave 1: 2 workers write files in isolated worktrees
+# Merge → typecheck fails on rate-limiter.ts
+# Corrective dispatch: worker for rate-limiter.ts only, with stderr attached
+# Re-merge → re-verify → all green
+# Branch loop/TKT-421 created
+```

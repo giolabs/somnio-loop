@@ -1,0 +1,45 @@
+# do
+
+## Overview
+
+The `do` skill is the main entry point for the somnio-loop plugin. It accepts a ticket or task description and orchestrates the full agentic loop end-to-end — from triage and planning through implementation, verification, and final artifact delivery.
+
+## When to use
+
+- User pastes a Jira/Linear/GitHub ticket or a free-form task description
+- User says `/loop:do`, "run this end to end", or "execute the full flow"
+- Any request that implies a multi-phase deliverable handed off to autonomous execution
+
+Do NOT use for single-step lookups or quick edits — those run without loop overhead.
+
+## Inputs
+
+| Input | Description |
+|---|---|
+| Ticket text | Full ticket body, bullet list, or bare ticket ID (e.g. `TKT-123`) |
+| `.loop/config.yaml` | Autonomy preset and gate configuration |
+| `.loop/state.md` | Prior run context and watch list |
+| `--autonomy=<preset>` | Optional per-run override at the end of the ticket |
+
+## Outputs
+
+| Output | Location |
+|---|---|
+| Final deliverable(s) | User's outputs folder |
+| `run-report.md` | Alongside every artifact |
+| `plan.yml` | `.loop/plans/<ts>-<ticket_hash>.yml` |
+| `trace.json` | `.loop/traces/<ts>-<ticket_hash>.json` |
+| Updated run-log | `.loop/run-log.md` |
+
+The final chat message always includes an executive summary and a per-agent consumption table (model, invocations, time, tokens, cost).
+
+## Example
+
+```bash
+/loop:do TKT-421 — Add rate limiting to the public API
+
+Acceptance criteria:
+- 429 returned after 100 req/min per API key
+- X-RateLimit-* headers on every response
+- Existing integration tests still pass
+```

@@ -1,0 +1,123 @@
+# Git Flow Integration
+
+The plugin classifies every code-writing ticket into one of eight types and applies the corresponding branch naming, base branch, and PR target automatically.
+
+## Ticket types at a glance
+
+| Type | Branch pattern | Base | PR target | Commit prefix |
+|---|---|---|---|---|
+| `feature` | `feature/{ticket_id}-{slug}` | `develop` | `develop` | `feat:` |
+| `bugfix` | `bugfix/{ticket_id}-{slug}` | `develop` | `develop` | `fix:` |
+| `hotfix` | `hotfix/{ticket_id}-{slug}` | `main` | `main` + back-merge to `develop` | `fix:` |
+| `release` | `release/{version}` | `develop` | `main` + back-merge to `develop` | `chore(release):` |
+| `chore` | `chore/{ticket_id}-{slug}` | `develop` | `develop` | `chore:` |
+| `docs` | `docs/{ticket_id}-{slug}` | `develop` | `develop` | `docs:` |
+| `refactor` | `refactor/{ticket_id}-{slug}` | `develop` | `develop` | `refactor:` |
+| `spike` | `spike/{ticket_id}-{slug}` | `develop` | `develop` | `chore(spike):` |
+
+Slugs are kebab-case English, max 50 characters.
+
+## Classification signals
+
+Triage evaluates signals top-to-bottom; first match wins.
+
+| Type | Key signals |
+|---|---|
+| `hotfix` | "hotfix", "P0", "P1", "production down", "URGENT", branch fix needed on main |
+| `release` | "release v", "cut release", "prepare release", title matches `release\s+v?\d` |
+| `bugfix` | "fix", "bug", "regression", "resolve" — no production urgency |
+| `docs` | Only doc verbs + only `.md`/`docs/` paths mentioned |
+| `chore` | Dependency bumps, CI config, tooling changes, no application logic |
+| `refactor` | "refactor", "rename", "extract", "no new behavior" |
+| `spike` | "spike", "POC", "investigate", "prototype", "throwaway" |
+| `feature` | Anything else with new-functionality verbs (`add`, `build`, `implement`) |
+
+## Configuration
+
+```yaml
+# .loop/config.yaml
+git_flow:
+  enabled: true
+  base_branch: develop
+  main_branch: main
+
+  branch_patterns:
+    feature:  "feature/{ticket_id}-{slug}"
+    bugfix:   "bugfix/{ticket_id}-{slug}"
+    hotfix:   "hotfix/{ticket_id}-{slug}"
+    release:  "release/{version}"
+    chore:    "chore/{ticket_id}-{slug}"
+    docs:     "docs/{ticket_id}-{slug}"
+    refactor: "refactor/{ticket_id}-{slug}"
+    spike:    "spike/{ticket_id}-{slug}"
+
+  commit_message:
+    style: conventional   # conventional | simple | none
+
+  follow_up:
+    hotfix_back_merge_to_develop: true
+    release_back_merge_to_develop: true
+```
+
+## Alternative strategies
+
+**GitHub Flow** (main only):
+
+```yaml
+git_flow:
+  base_branch: main
+  main_branch: main
+  pr_targets:
+    feature: main
+    bugfix: main
+    hotfix: main
+    # ... all types → main
+  follow_up:
+    hotfix_back_merge_to_develop: false
+    release_back_merge_to_develop: false
+```
+
+**Trunk-based development** (no branch type prefixes):
+
+```yaml
+git_flow:
+  base_branch: main
+  branch_patterns:
+    feature:  "{ticket_id}-{slug}"
+    bugfix:   "{ticket_id}-{slug}"
+    # ... all types use simple pattern
+```
+
+## How the plugin creates branches
+
+The plugin never touches your current HEAD. It uses a dedicated worktree for all writes and verifies the invariant before and after the run.
+
+```
+1. Snapshot user HEAD and current branch
+2. Resolve base branch for this ticket type
+3. Create new branch pointing to base (no checkout)
+4. Open a dedicated merge worktree on the new branch
+5. Apply each worker's diff into the merge worktree
+6. Commit with conventional message
+7. Remove all worktrees
+8. Assert user HEAD unchanged — abort with INVARIANT VIOLATED if not
+```
+
+## Conventional commit format
+
+```
+feat(PROJ-127): add Redis cache for session state
+
+Introduces Redis-backed session storage with TTL-based eviction.
+Replaces previous in-memory session store.
+
+Closes PROJ-127
+```
+
+## Hotfix safety
+
+Even with `autonomy: minimal`, the plugin always surfaces a confirmation before creating a `hotfix/*` branch from main. Hotfixes touch production paths and this friction is non-negotiable.
+
+## Disabling Git Flow
+
+Set `git_flow.enabled: false` to revert to the simpler `loop/<ticket_id>` branch model with no type classification.

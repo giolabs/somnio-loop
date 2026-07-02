@@ -1,0 +1,51 @@
+# loop-orchestrator
+
+## Overview
+
+`loop-orchestrator` implements the Orchestrator-Workers pattern: it fans out N independent sub-tasks to parallel worker agents in a single wave, collects their intermediate artifacts, and returns a summary to the runtime. It never synthesizes the final deliverable — that is the spec-writer's job.
+
+## When to use
+
+Triage selects this archetype when a phase contains N independent sub-tasks — multi-source research, side-by-side comparisons, per-item analysis — where worker K's output does not depend on worker K-1. For sequential pipelines where each step consumes the previous step's output, use `loop-plan-execute` instead.
+
+## Inputs
+
+A phase spec block from `plan.yml`:
+
+```yaml
+phase: research
+archetype: orchestrator-workers
+workers:
+  - id: w1
+    model: sonnet
+    prompt: "Research option A — scope, maturity, trade-offs."
+  - id: w2
+    model: sonnet
+    prompt: "Research option B — scope, maturity, trade-offs."
+artifact_dir: /tmp/loop-runs/<ts>/intermediates/research/
+acceptance:
+  - one .md per worker, 200-500 words
+  - each must cite at least 2 sources
+budget:
+  max_total_tokens: 100000
+  per_worker_timeout_s: 300
+```
+
+## Outputs
+
+| Output | Description |
+|---|---|
+| Artifact files | One file per worker at `artifact_dir/<worker_id>.md` |
+| Runtime summary | List of artifact paths + token usage + any soft warnings |
+
+Workers that fail are retried once with the failure mode in the prompt. Persistent failures are surfaced to the runtime — never silently dropped.
+
+## Example
+
+```bash
+# Triage selects orchestrator-workers for:
+# "Compare Vite, Turbopack, and esbuild as build tools for our frontend"
+#
+# Dispatches 3 workers in parallel → 3 research artifacts
+# spec-writer assembles the final comparison document in Phase 5
+```

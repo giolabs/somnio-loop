@@ -1,0 +1,38 @@
+# loop-adr
+
+## Overview
+
+`loop-adr` generates a new Architecture Decision Record (ADR) for tickets that involve a meaningful architectural choice. It performs codebase analysis, surfaces trade-offs, detects PR/MR conflicts, and derives acceptance criteria from existing tests — all before a single line of implementation is written.
+
+## When to use
+
+Invoked automatically by `loop-runtime` as Phase 0 when triage classifies a ticket as containing an architectural decision: new technology adoption, API design, data model changes, infrastructure choices, or cross-cutting concerns. The user never calls it directly.
+
+## Inputs
+
+| Field | Description |
+|---|---|
+| `ticket` | Verbatim ticket text |
+| `title` | Short imperative phrase (inferred if not provided) |
+| `remote_adrs_url` | Optional URL to another repo's `docs/adr/` for style reference |
+| `repo_url` | Optional repo URL for open PR/MR conflict scanning |
+| `output_lang` | `es` or `en` — inherited from project detection, never asked |
+| `run_dir` | Intermediates directory (`/tmp/loop-runs/<ts>/`) |
+
+## Outputs
+
+| Output | Location |
+|---|---|
+| ADR file | `<repo_root>/docs/adr/ADR-NNN-<slug>.md` |
+| Phase report | `<run_dir>/loop-adr-report.md` |
+
+The ADR feeds directly into `loop-generate-spec`: its `## Decision` section becomes spec §10 (locked), its acceptance criteria seed spec §8, and its technical gaps populate spec §4 as blocking prerequisites.
+
+## Example
+
+```bash
+# Triggered automatically when triage detects an architectural decision, e.g.:
+# "Adopt Redis for distributed session caching — replace current in-memory store"
+#
+# Produces: docs/adr/ADR-007-use-redis-for-session-caching.md
+```

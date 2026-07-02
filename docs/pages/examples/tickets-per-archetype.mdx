@@ -1,0 +1,43 @@
+# Tickets per Archetype
+
+Triage picks the right archetype automatically. These examples show what kinds of tickets trigger each one — copy any of them verbatim.
+
+## Orchestrator-Workers
+
+Use when the ticket has N independent sub-tasks that can run in parallel and don't depend on each other's output.
+
+```bash
+do "Research and compare Vite, esbuild, Turbopack, Rollup, and Parcel: bundle size, HMR speed, ecosystem support. Produce a comparison table."
+```
+
+## Plan-Execute
+
+Use when the ticket is a sequential pipeline where each step consumes the output of the previous one.
+
+```bash
+do "Extract all user records from the legacy PostgreSQL schema, transform them to the new UserProfile shape, and load them into the v2 database."
+```
+
+## Self-Healing
+
+Use for any code-writing ticket — workers run in isolated git worktrees, the verifier executes lint/typecheck/tests, and failed files are retried automatically (up to 3 times).
+
+```bash
+do "Implement the EmailVerificationService: send token on signup, verify endpoint, expiry logic. Include unit tests."
+```
+
+## Generate-Spec
+
+Use when the ticket implies a non-trivial feature and you want a validated 20-section spec before any code is written. Triage picks this when it detects implementation scope without sufficient acceptance criteria.
+
+```bash
+do "Add multi-factor authentication to the login flow: TOTP and SMS fallback. Generate spec before coding."
+```
+
+## ADR
+
+Use when the ticket contains architectural verbs — *adopt*, *migrate*, *replace*, *introduce* — or proposes a new technology, data model, API design, or infrastructure change.
+
+```bash
+do "Adopt Redis for session caching and replace the current in-memory store. Document the decision with trade-offs."
+```

@@ -1,0 +1,40 @@
+# loop-generate-spec
+
+## Overview
+
+`loop-generate-spec` transforms a raw feature idea or development ticket into a complete, validated 20-section spec. It uses a Haiku sub-agent to refine the idea, a Sonnet sub-agent to validate the result, and writes the spec under `.planning/phases/<slug>/spec.md` — the contract that all implementation workers receive.
+
+## When to use
+
+Invoked automatically by `loop-runtime` as Phase 1 of any development ticket. The user never calls it directly. It never produces code — its sole output is the spec (and an optional `api-contract.md` when the ticket involves an API surface).
+
+## Inputs
+
+| Field | Description |
+|---|---|
+| `raw_idea` | Ticket text verbatim |
+| `repo_root` | Absolute path to the project root |
+| `run_dir` | Intermediates directory (`/tmp/loop-runs/<ts>/`) |
+| `adr_decision_summary` | *(Optional)* Locks spec §10 with the upstream ADR decision |
+| `adr_acceptance_seeds` | *(Optional)* Seeds spec §8 and §11 from the ADR's acceptance criteria |
+| `adr_technical_gaps` | *(Optional)* Populates spec §4 as BLOCKING prerequisites |
+
+## Outputs
+
+| Output | Location |
+|---|---|
+| Spec file | `<repo_root>/.planning/phases/<slug>/spec.md` |
+| API contract | `<repo_root>/.planning/phases/<slug>/api-contract.md` (when applicable) |
+| Phase report | `<run_dir>/loop-generate-spec-report.md` |
+
+The validator returns one of three verdicts: `PASS`, `PASS_WITH_WARNINGS`, or `BLOCK`. A `BLOCK` verdict triggers up to 3 re-validation cycles before the skill stops with `status: blocked`.
+
+## Example
+
+```bash
+# Triggered automatically for a development ticket, e.g.:
+# "Implement email verification flow for new user sign-up"
+#
+# Produces: .planning/phases/email-verification-flow/spec.md
+#           .planning/phases/email-verification-flow/api-contract.md
+```

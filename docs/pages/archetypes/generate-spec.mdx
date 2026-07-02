@@ -1,0 +1,21 @@
+# Generate-Spec
+
+## When triage picks it
+
+Triage selects this archetype when a development ticket implies code work but no formal contract exists yet. The signal is a ticket that describes desired behavior — a feature, a component, an endpoint, a migration — without specifying the exact files, interfaces, or acceptance criteria needed to implement it safely. Triage refuses to send workers into code without a spec.
+
+## How it works
+
+A single-phase pipeline runs three agents in sequence:
+
+1. **spec-refiner** (Haiku) scans the ticket and the existing codebase context, then fills out the 20-section spec template section by section, flagging gaps it cannot resolve from available information.
+2. **spec-validator** (Sonnet) reviews the draft and returns one of three verdicts: `PASS`, `WARNINGS`, or `BLOCK`. A `BLOCK` triggers the `spec_clarification_gate`.
+3. On `PASS` or `WARNINGS`, the spec is written to `.loop/` and handed off as the contract for the subsequent `self-healing` phase.
+
+The output is a machine-readable spec that worker-dev agents consume directly — no human reformatting required.
+
+## Real-world ticket example
+
+```bash
+do "I want to add a dark mode toggle to the dashboard — it should persist the user's preference across sessions"
+```

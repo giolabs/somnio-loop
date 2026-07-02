@@ -1,0 +1,5 @@
+# somnio-loop project structure conventions
+# Used by /generate-spec and somnio-loop:spec-refiner to locate specs.
+
+specs_dir: docs/specs/<slug>
+spec_filename: spec.md

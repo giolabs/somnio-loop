@@ -1,0 +1,112 @@
+# Autonomy Config
+
+The `.loop/config.yaml` file is the single control surface for how much autonomy the plugin exercises. It is read at every Phase -1 before any agent is dispatched.
+
+## Presets
+
+Set `autonomy.preset` to one of three values. That is usually the only line you need.
+
+| Preset | Who decides | Typical interactions per ticket |
+|---|---|---|
+| `minimal` | Plugin decides everything except safety floors | 0–1 |
+| `ownership` | Human owns architecture, risk, and delivery moments | 3–5 |
+| `custom` | Every gate defined explicitly by the user | varies |
+
+```yaml
+# .loop/config.yaml
+autonomy:
+  preset: ownership
+```
+
+> Presets are self-contained. Setting `preset: minimal` implies all gate defaults — you do not need to list each gate.
+
+## Preset expansion
+
+| Gate | `minimal` | `ownership` |
+|---|---|---|
+| `budget_gate.on_exceed` | `proceed` | `ask` (only if >2x threshold) |
+| `verifier_blocking_gate.on_blocking` | `auto_fix` (2 retries) | `auto_fix` (2 retries) |
+| `adr_conflict_gate.on_high_conflict` | `proceed_with_record` | `ask` |
+| `adr_rule_violation_gate.on_violation` | `ask` (safety floor) | `ask` (safety floor) |
+| `spec_clarification_gate.on_gaps` | `use_defaults_and_flag` | `use_defaults_and_flag` |
+| `self_healing_exhaust_gate.on_exhausted` | `escalate_silent` | `ask` |
+| `pr_creation_gate.on_ready` | `proceed` (draft only) | `ask` |
+| `notification_gate.enabled` | `false` | `false` |
+
+## Custom preset
+
+If you set `preset: custom`, every gate must be defined explicitly. Partial configs are rejected at Phase -1.
+
+```yaml
+autonomy:
+  preset: custom
+
+gates:
+  budget_gate:
+    enabled: true
+    threshold_usd: 2.00
+    on_exceed: ask           # ask | proceed | abort
+
+  verifier_blocking_gate:
+    enabled: true
+    on_blocking: auto_fix
+    auto_fix_max_retries: 2  # max 5; higher values rejected
+
+  adr_conflict_gate:
+    enabled: true
+    on_high_conflict: ask    # ask | proceed_with_record | abort
+
+  adr_rule_violation_gate:
+    enabled: true
+    on_violation: ask        # ask | abort — "proceed" is REJECTED
+
+  spec_clarification_gate:
+    enabled: true
+    on_gaps: use_defaults_and_flag
+    max_questions: 0         # max 20
+
+  self_healing_exhaust_gate:
+    enabled: true
+    on_exhausted: escalate_silent
+
+  ticket_status_update_gate:
+    enabled: true
+    on_complete: proceed
+
+  pr_creation_gate:
+    enabled: true
+    on_ready: ask
+
+  notification_gate:
+    enabled: false
+    on_complete: skip
+```
+
+## Gate actions
+
+| Action | Effect |
+|---|---|
+| `ask` | Run pauses; user presented 2–3 options |
+| `proceed` | Continue on default safe path; decision recorded |
+| `proceed_with_record` | Continue; item added to STATE Watch List |
+| `proceed_with_warnings` | Continue; run marked `status: partial` |
+| `auto_fix` | Corrective worker dispatched; capped at `auto_fix_max_retries` |
+| `escalate_silent` | Item added to STATE High Priority; no interrupt |
+| `abort` | Run stops; status set to `aborted` |
+
+## Per-run override
+
+Append `--autonomy=<preset>` to any ticket invocation. The override applies to that run only; the config file is not modified.
+
+```
+do "Migrate auth to Riverpod --autonomy=minimal"
+```
+
+## Safety floors
+
+These four rules apply regardless of preset and cannot be configured away:
+
+1. PRs are never auto-merged.
+2. Nothing is ever pushed to `main`, `master`, or protected branches.
+3. Denylist paths from `budget.md` are never written to.
+4. Documented rule violations (`adr_rule_violation_gate`) can only trigger `ask` or `abort` — never `proceed`.

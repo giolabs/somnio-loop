@@ -21,11 +21,17 @@ build/
 *.code-workspace
 .cursor/
 .windsurf/
+.remember/
+.loop/
 
 # Test scratch
 /tmp/
 scratch/
 .test-output/
+
+# Docs site build artifacts (Nextra / Next.js)
+docs/.next/
+docs/out/
 
 # Node (in case anyone adds tooling that uses it)
 node_modules/

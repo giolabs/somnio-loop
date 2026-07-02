@@ -1,0 +1,63 @@
+# Maturity Model
+
+The triage agent assigns a readiness level to every ticket. The level gates what the plugin will and will not do during that run.
+
+## The four levels
+
+| Level | Name | What it does | What it does not do |
+|---|---|---|---|
+| **L0** | Draft | Produces a `plan.yml` and a one-page intent report. No agent dispatch beyond triage. | Any write to user-facing artifacts. |
+| **L1** | Report | Runs research, discovery, and audit phases. Reads code. Produces analysis reports. | Code writes, spec writes, ADR writes, git operations. |
+| **L2** | Assisted | Produces specs, ADRs, and code changes in worktrees. Every write goes through an approval gate before committing. | Auto-merging PRs or pushing to protected branches. |
+| **L3** | Unattended | Full autonomy. No approval gate. Self-healing converges without human input. | Auto-merging PRs (never, even L3). Writing to denylist paths. |
+
+## Per-level capability table
+
+| Capability | L0 | L1 | L2 | L3 |
+|---|---|---|---|---|
+| Triage emits plan | yes | yes | yes | yes |
+| Sub-agent dispatch | no | yes (research only) | yes | yes |
+| Spec write to `.planning/` | no | no | yes (after approval) | yes |
+| ADR write to `docs/adr/` | no | no | yes (after approval) | yes |
+| Worker writes to code paths | no | no | yes (in worktree) | yes (in worktree) |
+| Self-healing retries | no | no | yes (max 3) | yes (max 3) |
+| PR description write | no | no | yes | yes |
+| Append to `.loop/state.md` | yes | yes | yes | yes |
+| Append to `.loop/run-log.md` | yes | yes | yes | yes |
+| Touch denylist paths | never | never | never | never |
+| Merge to main / protected branches | never | never | never | never |
+
+## Denylist paths (all levels)
+
+These paths are never written to, regardless of level or autonomy setting:
+
+- `.env`, `.env.*`
+- `secrets/`, `secret/`, `private/`
+- `infra/production/`, `terraform/production/`, `k8s/production/`
+- `.git/objects/`, `.git/hooks/`
+- Any path starting with `.ssh/`, `.aws/`, `.gcloud/`, `.kube/`
+
+## How triage assigns a level
+
+Rules are evaluated in order; first match wins.
+
+| Rule | Outcome |
+|---|---|
+| User explicitly requested a level in the ticket | Honor it |
+| Ticket touches denylist paths | Cap at L1 regardless of request |
+| Run log shows 3+ successful runs of this archetype | Default L2 (or L3 if prior runs were marked `success_no_review_needed`) |
+| Run log shows 1+ successful runs of this archetype | Default L2 with approval gate |
+| No history or fewer than 1 successful run | Default L1 |
+| Ticket is purely conversational ("explain X") | L0 — no agents needed |
+
+After picking a level, triage tells the user which level was chosen and why, then offers to downshift via `AskUserQuestion`. Upshifting requires explicit confirmation.
+
+## Recommended rollout
+
+| Period | Approach |
+|---|---|
+| Week 1 | Run all tickets at L1. Review artifacts manually. Build trust. |
+| Week 2 | For ticket types reviewed successfully twice, move to L2. |
+| Week 3+ | For trivial recurring tickets (rename, typo, single-file), move to L3. |
+
+The plugin surfaces the data from `.loop/run-log.md` and makes recommendations. You decide when to advance.

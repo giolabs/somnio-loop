@@ -1,0 +1,55 @@
+# loop-plan-execute
+
+## Overview
+
+`loop-plan-execute` implements the Plan-Execute pattern: a sequential pipeline where each step consumes the previous step's output. It uses TaskCreate/TaskUpdate as a durable state machine, supports replanning on step failure, and returns all step artifacts to the runtime without synthesizing them.
+
+## When to use
+
+Triage selects this archetype when steps have explicit dependencies — step N needs step N-1's output before it can run. Typical examples: research → outline → draft → revise, or extract → transform → load → validate. For independent tasks that can run in parallel, use `loop-orchestrator` instead.
+
+## Inputs
+
+A phase spec block from `plan.yml`:
+
+```yaml
+phase: pipeline
+archetype: plan-execute
+steps:
+  - id: s1
+    name: research
+    model: sonnet
+    prompt: "..."
+    output: /tmp/loop-runs/<ts>/intermediates/research.md
+    depends_on: []
+  - id: s2
+    name: build-matrix
+    model: sonnet
+    prompt: "Read {{s1.output}}, extract structured comparison matrix."
+    output: /tmp/loop-runs/<ts>/intermediates/matrix.csv
+    depends_on: [s1]
+replan_policy: on_failure
+budget:
+  max_total_tokens: 80000
+```
+
+## Outputs
+
+| Output | Description |
+|---|---|
+| Step artifacts | One file per step at the configured `output` path |
+| Task list state | `completed` / `failed` / `skipped` per step |
+| Replan log | Present when any step triggered replanning |
+| Token usage | Cumulative across all steps |
+
+When a step fails, a small replanner worker decides: retry with an adjusted prompt, skip the step if downstream is still viable, or escalate to the user. Maximum 2 replans per phase.
+
+## Example
+
+```bash
+# Triage selects plan-execute for:
+# "Research our top 3 auth libraries and write a recommendation doc"
+#
+# s1: research.md  →  s2: matrix.csv  →  s3: recommendation.md
+# Each step reads the previous step's file before running.
+```

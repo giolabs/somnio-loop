@@ -1,0 +1,32 @@
+# ADR
+
+## When triage picks it
+
+Triage selects this archetype when the ticket implies an architectural decision rather than (or in addition to) a code change. Trigger signals include:
+
+- Action verbs: *adopt*, *migrate*, *replace*, *switch to*, *move away from*
+- Introduction of a new technology, library, or infrastructure component not currently in the codebase
+- Changes to data models, API contracts, or cross-service boundaries
+- Infrastructure topology changes (caching layer, queue, storage backend, auth provider)
+
+Triage may stack the ADR archetype before `generate-spec` and `self-healing` when the ticket implies both a decision and an implementation.
+
+## How it works
+
+The `adr-author` agent (Sonnet) runs a 12-step flow:
+
+1. Reads the ticket and classifies the decision type.
+2. Scans the codebase and `.rules`/`AGENTS.md`/`CLAUDE.md` for existing constraints that bear on the decision.
+3. Enumerates alternatives considered (at least three).
+4. Analyzes the diff surface for PR conflicts with open branches.
+5. Evaluates each alternative against documented project conventions.
+6. Selects a recommendation and records the rationale.
+7. Writes the ADR to the standard format under `docs/decisions/` (or the path your project uses).
+
+If the selected option conflicts with a documented rule, the `adr_rule_violation_gate` fires — this gate cannot be set to `proceed`. If the diff analysis reveals high conflict potential, the `adr_conflict_gate` fires per your autonomy preset.
+
+## Real-world ticket example
+
+```bash
+do "Use Redis for session caching instead of the current in-memory store — we need sessions to survive pod restarts"
+```

@@ -1,0 +1,67 @@
+# Quickstart
+
+Get somnio-loop running in under five minutes. See [CHANGELOG.md](https://github.com/giosomniodev/somnio-loop/blob/main/CHANGELOG.md) for the current release version.
+
+## Prerequisites
+
+Before installing, confirm you have the following:
+
+- **Claude Code CLI** — installed and authenticated
+- **Node.js 20 or later**
+- **pnpm or npm** (for any project-level tooling)
+
+## Installation
+
+Run these three commands once. No project-specific setup is required to get started.
+
+```bash
+# 1) Register the marketplace source
+claude plugin marketplace add giosomniodev/somnio-loop
+
+# 2) Install the plugin
+claude plugin install somnio-loop@somnio-loop
+
+# 3) Confirm it is active
+claude plugin list | grep somnio-loop
+```
+
+## First Run
+
+Open Claude Code inside any project directory and invoke the `do` command with a plain-text prompt:
+
+```
+somnio-loop:do "Investigate the last 3 TypeScript releases and write a 300-word summary."
+```
+
+The plugin surfaces its resolved stance immediately:
+
+```
+🎚 Readiness level: L1 (report-only) — first run on this repo.
+🎛 Autonomy: balanced (default from .loop/config.yaml)
+```
+
+From there it runs triage, fans out workers, executes the verifier, and delivers a consolidated artifact with a per-agent consumption table. For a research prompt of this size, expect roughly 3–5 minutes and $0.30–$0.50 USD.
+
+## Minimal Config
+
+On first run, somnio-loop creates `.loop/config.yaml` automatically. You only need to edit it to connect a ticket tracker or change the autonomy preset. A complete working config looks like this:
+
+```yaml
+# .loop/config.yaml
+autonomy:
+  preset: minimal   # or ownership or custom
+
+mcp_integrations:
+  ticket_source:
+    type: jira
+    project_key: "PROJ"
+  pr_target:
+    type: github
+    owner: "your-org"
+    repo: "your-repo"
+    base_branch: "develop"
+```
+
+The preset drives all gate defaults — you never need to spell out individual gate values unless you choose `preset: custom`. Observability (surface lines, per-agent consumption table, run report, STATE updates) is always on regardless of preset.
+
+For the full gate reference and per-preset behavior, see [Autonomy & Gates](/docs/references/autonomy-config).

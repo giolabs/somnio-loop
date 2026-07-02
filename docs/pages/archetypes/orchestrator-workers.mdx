@@ -1,0 +1,17 @@
+# Orchestrator-Workers
+
+## When triage picks it
+
+Triage selects this archetype when the ticket contains N independent sub-tasks that carry no data dependency on each other — meaning all of them can start at the same time. Common signals: explicit enumeration ("research X options", "compare Y libraries"), audit-style requests, or any ticket where the result is a synthesis of parallel findings.
+
+## How it works
+
+The orchestrator decomposes the ticket into a set of worker assignments. Each worker runs in isolation — separate sub-agent context, separate git worktree when the task involves code. Workers execute in parallel waves. When all workers in a wave complete, their outputs are merged and handed to the spec-writer (Opus) for final synthesis and artifact assembly.
+
+The number of waves depends on whether any later tasks depend on the merged output of earlier ones. Pure fan-out tickets run in a single wave.
+
+## Real-world ticket example
+
+```bash
+do "Research 5 JavaScript bundlers (Webpack, Vite, esbuild, Rollup, Parcel) and produce a comparison table covering build speed, bundle size, config complexity, and ecosystem maturity"
+```

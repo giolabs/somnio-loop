@@ -1,0 +1,19 @@
+# Self-Healing
+
+## When triage picks it
+
+Triage selects this archetype for any code-writing phase — when the ticket requires creating or modifying source files and the project has discoverable verification commands (lint, typecheck, tests, build). It is almost always preceded by a `generate-spec` phase; the spec becomes the contract the workers implement.
+
+## How it works
+
+Each file assignment is dispatched to a `worker-dev` sub-agent running in an isolated `git worktree`. Workers operate in parallel, one file per invocation. When workers complete, the verifier runs the project's actual verification suite — no mocked checks.
+
+If a verification command fails, the loop identifies which file caused the failure and re-dispatches a corrective worker with the failure output attached. The worker edits only the minimum necessary to fix the named error. This retry cycle runs up to three times per file. If the file still fails after the maximum retries, the `self_healing_exhaust_gate` fires according to your autonomy preset.
+
+Your HEAD is invariant throughout — the plugin never touches your working tree.
+
+## Real-world ticket example
+
+```bash
+do "Implement the login form component with unit tests and integration tests — email + password fields, validation, error states, and a loading spinner on submit"
+```

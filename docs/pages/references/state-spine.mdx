@@ -1,0 +1,107 @@
+# State Spine
+
+The plugin maintains all persistent state inside a single directory at your repo root: `.loop/`. Every file is plain Markdown or YAML — readable and diffable without the plugin.
+
+## Directory layout
+
+```
+<repo_root>/.loop/
+├── state.md            # Durable run state — read at start, updated at end
+├── run-log.md          # Append-only history, one entry per run
+├── budget.md           # Daily/weekly caps and kill switch
+├── config.yaml         # Autonomy presets and gate behavior
+├── traces/             # Machine-readable JSON traces, one per run
+│   └── <ts>-<ticket_hash>.json
+└── plans/              # Archived plan.yml per run
+    └── <ts>-<ticket_hash>.yml
+```
+
+If `.loop/` does not exist when a run starts, the plugin creates it from templates.
+
+## `state.md`
+
+Tracks high-priority items waiting on human input, a watch list, and a conventions snapshot used as a fast cache between runs.
+
+```markdown
+# Loop state — <project-name>
+
+Last run: <ISO-8601>
+Last status: completed | partial | aborted
+Last readiness level: L1 | L2 | L3
+
+## High Priority (waiting on human)
+
+- [ ] **PROJ-127** — Redis cache spike blocked on infra approval. Last touched: 2024-01-15T10:00Z.
+
+## Watch List
+
+- **PROJ-128** — Auth refactor. Reason: ADR conflict with open PR #45.
+
+## Conventions snapshot
+
+- project_type: backend
+- sub_type: nestjs
+- task_runner: Makefile
+- verification:
+    lint: make lint
+    typecheck: make typecheck
+    test: make test
+```
+
+## `run-log.md`
+
+Append-only. The plugin never edits or deletes existing entries.
+
+```markdown
+## 2024-01-15T10:32:00Z — PROJ-127
+
+- **Status:** completed
+- **Readiness level:** L2
+- **Duration:** 4m 12s
+- **Tokens:** 84,300 total
+- **Cost estimate:** $0.42
+- **Artifacts produced:**
+  - src/cache/redis-session.ts
+  - docs/adr/ADR-001-redis-session.md
+- **Self-healing retries:** 1
+- **Trace:** .loop/traces/20240115T103200-proj127.json
+```
+
+## `budget.md`
+
+```yaml
+daily:
+  max_tokens: 500000
+  max_cost_usd: 5.00
+  max_runs: 20
+weekly:
+  max_tokens: 2000000
+  max_cost_usd: 25.00
+per_run:
+  max_tokens: 250000
+  max_cost_usd: 3.00
+  max_duration_seconds: 1800
+kill_switch:
+  enabled: false
+  reason: ""
+  paused_until: ""    # ISO-8601 timestamp to auto-resume
+denylist_paths:
+  - .env
+  - .env.*
+  - secrets/
+  - infra/production/
+```
+
+Setting any cap to `0` disables the plugin until manually reset. Setting `kill_switch.enabled: true` shows the reason in chat and refuses to run.
+
+## How the plugin uses `.loop/`
+
+| Moment | Action |
+|---|---|
+| Run start | Read `state.md`, tail of `run-log.md` (last 10), and `budget.md`. Abort if budget exhausted or kill switch active. |
+| After plan emitted | Validate all worker write paths against `denylist_paths`. Reject plan if any path matches. |
+| Run end | Append entry to `run-log.md`. Update `state.md`. Save `trace.json` and `plan.yml` archives. |
+
+## Version control
+
+Add `.loop/` to `.gitignore` for solo use. Commit it if you want to share run history and state across a team — the schema is review-friendly plain text.

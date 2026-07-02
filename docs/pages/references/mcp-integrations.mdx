@@ -1,0 +1,115 @@
+# MCP Integrations
+
+The plugin does not bundle its own MCP servers. It discovers and adapts to whatever MCP servers you have connected to Claude Code at runtime.
+
+## Three integration points
+
+### 1. Ticket source
+
+Fetches the full ticket when you invoke `do PROJ-123`. Falls back to asking you to paste the text manually if no MCP is available.
+
+| Source | Detected tool names |
+|---|---|
+| Jira (Atlassian Remote) | `mcp__atlassian__getJiraIssue`, `mcp__atlassian__searchJiraIssuesUsingJql` |
+| Linear | `mcp__linear__get_issue`, `mcp__linear__list_issues` |
+| GitHub Issues | `mcp__github__get_issue`, `mcp__github__search_issues` |
+| GitLab Issues | `mcp__gitlab__get_issue` |
+
+### 2. PR / branch operations
+
+Creates the PR after Phase 3 (PR description) is composed. Gated behind `pr_creation_gate`.
+
+| Host | Detected tool names |
+|---|---|
+| GitHub | `mcp__github__create_pull_request`, `mcp__github__create_branch` |
+| GitLab | `mcp__gitlab__create_merge_request` |
+
+PRs are always opened as **draft**. The plugin never merges, squashes, or sets auto-merge.
+
+### 3. Notifications
+
+Optional. Posts a run summary after completion. Disabled by default via `notification_gate`.
+
+| Channel | Detected tool names |
+|---|---|
+| Slack | `mcp__slack__send_message`, `mcp__slack__post_message` |
+| Microsoft Teams | `mcp__teams__send_message` |
+| Discord | `mcp__discord__send_message` |
+
+## Config schema
+
+```yaml
+# .loop/config.yaml
+mcp_integrations:
+  ticket_source:
+    type: jira           # jira | linear | github_issues | gitlab_issues | none
+    cloud_id: ""         # Jira only — auto-discovered if blank
+    project_key: "PROJ"
+    required: false      # if true: abort run when MCP is unavailable
+    update_status_on_complete: true
+    status_in_progress: "In Progress"
+    status_in_review: "In Review"
+    custom_field_acceptance_criteria: "customfield_10001"
+    comment_template: "default"
+
+  pr_target:
+    type: github         # github | gitlab | none
+    owner: "YOUR_ORG"
+    repo: "YOUR_REPO"
+    base_branch: "develop"
+    draft_default: true
+    pr_template_path: ".github/pull_request_template.md"
+
+  notification:
+    type: slack          # slack | teams | discord | none
+    channel: "#dev-loops"
+    notify_on: [completed, partial, aborted]
+    summary_template: "default"
+```
+
+> All token and credential values are read from your MCP server's own configuration — never stored in `.loop/config.yaml`. Use placeholders like `YOUR_JIRA_API_KEY` in your MCP server env file.
+
+## Jira / Atlassian Remote MCP
+
+**Ticket fetch flow:**
+
+1. Call `getAccessibleAtlassianResources()` to resolve the cloud ID.
+2. Call `getJiraIssue(cloudId, "PROJ-123")` — returns summary, description, custom fields.
+3. Parse `summary` → title, `description` → body, `customfield_*` → acceptance criteria.
+4. Synthesize into a unified `ticket_text` string.
+
+**Post-run status update:**
+
+After Phase 7 (STATE update), if `update_status_on_complete: true`:
+
+1. Call `editJiraIssue` to set status to `status_in_review`.
+2. Call `addCommentToJiraIssue` with run summary, per-agent token table, PR link, and ADR link.
+3. Status update failure is non-fatal — logged as a warning.
+
+## GitHub Issues + PRs
+
+```
+Ticket fetch:  mcp__github__get_issue(owner, repo, issue_number)
+PR creation:   mcp__github__create_pull_request(owner, repo, title, body, head, base, draft=true)
+PR list:       mcp__github__list_pull_requests  (for ADR conflict detection)
+```
+
+## Linear
+
+```
+Ticket fetch:  mcp__linear__get_issue(id)
+Status update: mcp__linear__update_issue(id, fields)
+Comment:       mcp__linear__create_comment(issueId, body)
+```
+
+## Runtime discovery
+
+At Phase -1, the plugin runs `ToolSearch` for each declared integration and caches the discovered tool names. If a required integration is unavailable, the run aborts with a clear message. Optional integrations fall back to manual mode silently.
+
+## Hard rules
+
+1. PRs are always opened as draft. Users mark "ready for review" manually.
+2. `gh pr merge`, `git push origin main`, and any merge-equivalent call are never made.
+3. Ticket status is never set to "Done" automatically — "In Review" is the maximum.
+4. Branch cleanup is never performed autonomously.
+5. If no MCP is configured, the plugin falls back to manual ticket text with no behavioral change.

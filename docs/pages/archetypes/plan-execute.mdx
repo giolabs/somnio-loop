@@ -1,0 +1,17 @@
+# Plan-Execute
+
+## When triage picks it
+
+Triage selects this archetype when the ticket describes a sequential pipeline where each step consumes the output of the previous one. The hallmark is explicit data flow: extract → transform → store, or scan → classify → report. Steps cannot be parallelized because step N+1 requires the result of step N.
+
+## How it works
+
+Triage produces a `plan.yml` with ordered phases and declared inputs/outputs per phase. The runtime executes phases one by one, passing the output artifact of each phase as the named input to the next. If a phase fails, the pipeline stops at that point — earlier phase outputs are preserved in `.loop/` for inspection and resumption.
+
+The final artifact is assembled by the spec-writer once all phases complete, combining the chain of outputs into a single coherent deliverable.
+
+## Real-world ticket example
+
+```bash
+do "Extract all TODO and FIXME comments from the codebase, group them by file and severity, then write a prioritized backlog in Markdown with effort estimates"
+```
