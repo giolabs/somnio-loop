@@ -428,6 +428,110 @@ In v0.4.1 we surfaced readiness + STATE. The remaining observability gap was per
 
 The `🎚` line, the `📓 STATE` line, AND the `Consumo por agente` table are MANDATORY in v0.4.2. Skipping any one silences observability the user depends on.
 
+## Feedback protocol — preset: minimal
+
+When `autonomy.preset: minimal`, all gates are configured to `proceed` silently. The user has no approval interactions — **these feedback emissions are the only visibility mechanism during the run.** Emit each line as plain chat text (not buffered inside a code block), so it renders as the run progresses in real time.
+
+**When to activate:** check `autonomy.preset` from config. If `minimal`, follow this protocol at every checkpoint below. Other presets already surface context through their gate interactions; this section is only needed when the loop runs fully unattended.
+
+### Format
+
+```
+<emoji>  <Phase label> — <descriptor> · <key metric 1> · <key metric 2>
+```
+
+Use `  ├─` / `  └─` tree notation when listing multiple workers or items.
+
+### Emission checkpoints
+
+**Phase -1 complete:**
+```
+🔍  Phase -1 — spine OK · preset: minimal · MCP: <tool1> ✓  <tool2> ✓
+```
+Append `· scaffolded: <files>` if any spine file was missing and created.
+Append `· ☁️ cloudId cached` if Jira cloudId was fetched and written to config.
+
+**Phase 1 — triage complete** (emit immediately after plan.yml is verified):
+```
+🧠  Triage — <N> fase(s) · <W> workers total · ~$<est> est.
+    <phase_1_archetype> (<w1> workers) → <phase_2_archetype> (<w2> workers) ...
+```
+Example:
+```
+🧠  Triage — 2 fases · 4 workers total · ~$0.45 est.
+    generate-spec (1) → self-healing (3)
+```
+
+**Phase 2 — budget gate:**
+```
+💰  Budget — $<est> est. ≤ $<threshold> → proceeding
+```
+If over threshold (minimal proceeds anyway):
+```
+💰  Budget — $<est> est. > $<threshold> → proceeding (minimal: no ask)
+```
+
+**Phase 3 — emit BEFORE and AFTER each worker wave:**
+
+Before dispatch:
+```
+⚙️   Wave <n>/<total> — dispatching <W> workers (<archetype>)
+    ├─ w1: <scope>
+    ├─ w2: <scope>
+    └─ w<W>: <scope>
+```
+After wave completes:
+```
+⚙️   Wave <n>/<total> — done · <W_ok>/<W_total> OK · <retries> retries · <Xs> · <N>K tok
+```
+
+If shortcut path (≤5 workers, single wave):
+```
+⚡  Shortcut — dispatching <N> workers directly
+    ├─ w1: <scope>
+    └─ w<N>: <scope>
+⚡  Shortcut — done · <N_ok>/<N> OK · <retries> retries · <Xs>
+```
+
+**Phase 4 — verifier:**
+```
+🔎  Verifier — BLOCKING: <n> · WARNINGS: <n>
+```
+If `BLOCKING > 0` and `on_blocking: auto_fix`, emit per retry:
+```
+🔧  Auto-fix retry <k>/<max> — <resolved>/<total> findings resolved
+```
+Final:
+```
+🔎  Verifier — all clear → proceeding
+```
+or, if findings persist after all retries:
+```
+🔎  Verifier — <n> findings persist after <max> retries → proceeding with warnings (minimal)
+```
+
+**Phase 5 — synthesis routing:**
+```
+📝  Synthesis — spec-writer (opus) · doc ticket
+```
+or:
+```
+⏭   Synthesis — workers path · dev ticket · spec-writer skipped
+```
+
+**Phase 7 — external integrations** (only emit lines that fired):
+```
+🎫  Ticket <ID>: <status_before> → <status_after>
+🌿  PR: <URL>                          [or "branch: <name> (no PR)"]
+💬  Notification: posted to <channel>
+```
+
+### Why this matters
+
+In `minimal` mode the plugin is designed for CI/CD, batch runs, and trusted repeat tickets where interruptions are unwanted. But "no interruptions" cannot mean "no visibility" — the user (or the CI log) needs to know what's happening without reading intermediate files. These checkpoints convert the silent gate-proceed events into a legible, scannable run timeline in the chat or terminal output.
+
+---
+
 ## Hard rules
 
 - For document tickets (spec, research, ADR, report): spec-writer is the ONLY agent that writes the final deliverable. For development tickets (feature/bugfix/hotfix/chore/refactor): workers are the final writers; spec-writer is skipped (see Phase 5).

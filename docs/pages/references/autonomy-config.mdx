@@ -94,6 +94,40 @@ gates:
 | `escalate_silent` | Item added to STATE High Priority; no interrupt |
 | `abort` | Run stops; status set to `aborted` |
 
+## Continuous feedback in minimal preset
+
+When the preset is `minimal`, all gates are set to `proceed`. The plugin never asks questions — which means **feedback emissions are the only visibility mechanism** during the run.
+
+At each phase checkpoint the plugin emits a line in the chat following this format:
+
+```
+<emoji>  <Phase> — <descriptor> · <metric 1> · <metric 2>
+```
+
+Example of what you see during a minimal run:
+
+```
+🔍  Phase -1 — spine OK · preset: minimal · MCP: jira ✓  github ✓
+🧠  Triage — 2 phases · 4 workers total · ~$0.45 est.
+    generate-spec (1) → self-healing (3)
+💰  Budget — $0.45 est. ≤ $2.00 → proceeding
+⚙️   Wave 1/2 — dispatching 1 worker (generate-spec)
+    └─ w1: spec MH-204
+⚙️   Wave 1/2 — done · 1/1 OK · 0 retries · 42s · 38K tok
+⚙️   Wave 2/2 — dispatching 3 workers (self-healing)
+    ├─ w1: EmailVerificationService.ts
+    ├─ w2: EmailVerificationService.test.ts
+    └─ w3: email.types.ts
+⚙️   Wave 2/2 — done · 3/3 OK · 1 retry · 94s · 112K tok
+🔎  Verifier — BLOCKING: 0 · WARNINGS: 1
+🔎  Verifier — all clear → proceeding
+📝  Synthesis — spec-writer (opus) · doc ticket
+🎫  Ticket MH-204: In Progress → In Review
+🌿  PR: https://github.com/org/repo/pull/78
+```
+
+These checkpoints replace gate interactions as the user's progress signal — or appear in the CI log when the plugin runs in headless mode.
+
 ## Per-run override
 
 Append `--autonomy=<preset>` to any ticket invocation. The override applies to that run only; the config file is not modified.

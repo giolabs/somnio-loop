@@ -94,6 +94,40 @@ gates:
 | `escalate_silent` | Ítem agregado a High Priority del STATE; sin interrupción |
 | `abort` | Corrida se detiene; status se establece en `aborted` |
 
+## Feedback continuo en preset minimal
+
+Cuando el preset es `minimal`, todas las compuertas están configuradas en `proceed`. El plugin no hace ninguna pregunta — lo que significa que los **mensajes de feedback son el único mecanismo de visibilidad** durante la corrida.
+
+En cada checkpoint de fase, el plugin emite una línea en el chat con este formato:
+
+```
+<emoji>  <Fase> — <descriptor> · <métrica 1> · <métrica 2>
+```
+
+Ejemplos de lo que verás durante una corrida minimal:
+
+```
+🔍  Phase -1 — spine OK · preset: minimal · MCP: jira ✓  github ✓
+🧠  Triage — 2 fases · 4 workers total · ~$0.45 est.
+    generate-spec (1) → self-healing (3)
+💰  Budget — $0.45 est. ≤ $2.00 → proceeding
+⚙️   Wave 1/2 — dispatching 1 worker (generate-spec)
+    └─ w1: spec MH-204
+⚙️   Wave 1/2 — done · 1/1 OK · 0 retries · 42s · 38K tok
+⚙️   Wave 2/2 — dispatching 3 workers (self-healing)
+    ├─ w1: EmailVerificationService.ts
+    ├─ w2: EmailVerificationService.test.ts
+    └─ w3: email.types.ts
+⚙️   Wave 2/2 — done · 3/3 OK · 1 retry · 94s · 112K tok
+🔎  Verifier — BLOCKING: 0 · WARNINGS: 1
+🔎  Verifier — all clear → proceeding
+📝  Synthesis — spec-writer (opus) · doc ticket
+🎫  Ticket MH-204: In Progress → In Review
+🌿  PR: https://github.com/org/repo/pull/78
+```
+
+Estos checkpoints reemplazan las interacciones de compuertas como señal de progreso para el usuario — o para el log de CI cuando el plugin corre en modo headless.
+
 ## Override por corrida
 
 Agregá `--autonomy=<preset>` a cualquier invocación de ticket. El override aplica solo a esa corrida; el archivo de configuración no se modifica.
