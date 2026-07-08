@@ -1,0 +1,121 @@
+import { Tabs } from 'nextra/components'
+
+# Ejemplos de Run Report
+
+Cada corrida escribe dos artefactos en `.loop/`: una entrada legible por humanos en `run-log.md` y un `trace.json` legible por máquina en `.loop/traces/`. Todo el contenido a continuación es ilustrativo.
+
+## Entrada de run-log.md
+
+<Tabs items={['Condensado', 'Anotado']}>
+  <Tabs.Tab>
+  ```markdown
+  ## 2026-07-01T14:32:11Z — MYP-204
+
+  - **Status:** completed
+  - **Readiness level:** L2
+  - **Archetype phases:** generate-spec → self-healing
+  - **Duration:** 4m 18s
+  - **Tokens:** 187.430 total — Haiku: 42.100, Sonnet: 131.200, Opus: 14.130
+  - **Cost estimate:** $0.44
+  - **Artifacts produced:**
+    - .planning/phases/MYP-204-spec.md
+    - src/services/EmailVerificationService.ts
+    - src/services/__tests__/EmailVerificationService.test.ts
+  - **Verifier blocking findings:** 0
+  - **Self-healing retries:** 1
+  - **User overrides:** none
+  - **Trace:** .loop/traces/20260701T143211-myp204.json
+  - **Plan archive:** .loop/plans/20260701T143211-myp204.yml
+  ```
+  </Tabs.Tab>
+  <Tabs.Tab>
+  ```markdown
+  ## 2026-07-01T14:32:11Z — MYP-204
+  # ^ Timestamp ISO-8601 + ID de ticket. Agregado por spec-writer al final de la corrida.
+
+  - **Status:** completed
+  # completed | partial | aborted
+
+  - **Readiness level:** L2
+  # L1 = solo reporte, L2 = asistido, L3 = autonomía total. Asignado por triage.
+
+  - **Archetype phases:** generate-spec → self-healing
+  # El triage descompuso MYP-204 en dos fases: spec primero, luego código.
+
+  - **Duration:** 4m 18s
+  - **Tokens:** 187.430 total — Haiku: 42.100, Sonnet: 131.200, Opus: 14.130
+  # Haiku = auditoría del verifier. Sonnet = workers + triage + runtime. Opus = solo spec-writer.
+
+  - **Cost estimate:** $0.44
+  - **Artifacts produced:**
+    - .planning/phases/MYP-204-spec.md   # spec de 20 secciones
+    - src/services/EmailVerificationService.ts
+    - src/services/__tests__/EmailVerificationService.test.ts
+
+  - **Verifier blocking findings:** 0
+  # Distinto de cero significa que el verifier marcó issues. El self-healing puede haberlos corregido.
+
+  - **Self-healing retries:** 1
+  # Un archivo necesitó un despacho correctivo (error de tipo corregido en el reintento 1 de 3).
+
+  - **User overrides:** none
+  # Registra cualquier decisión de compuerta que el usuario haya anulado manualmente durante la corrida.
+
+  - **Trace:** .loop/traces/20260701T143211-myp204.json
+  - **Plan archive:** .loop/plans/20260701T143211-myp204.yml
+  ```
+  </Tabs.Tab>
+</Tabs>
+
+## trace.json
+
+<Tabs items={['Condensado', 'Reducido']}>
+  <Tabs.Tab>
+  ```json
+  {
+    "run_id": "20260701T143211-myp204",
+    "ticket_id": "MYP-204",
+    "status": "completed",
+    "readiness_level": "L2",
+    "preset": "ownership",
+    "phases": [
+      { "phase": "generate-spec", "status": "completed", "duration_ms": 98400 },
+      { "phase": "self-healing",  "status": "completed", "duration_ms": 160200 }
+    ],
+    "agents": [
+      { "agent": "triage",        "model": "sonnet", "tokens": 8200,  "cost_usd": 0.02 },
+      { "agent": "spec-refiner",  "model": "haiku",  "tokens": 21000, "cost_usd": 0.01 },
+      { "agent": "spec-validator","model": "sonnet", "tokens": 14300, "cost_usd": 0.04 },
+      { "agent": "worker-dev",    "model": "sonnet", "tokens": 108700,"cost_usd": 0.29 },
+      { "agent": "verifier",      "model": "haiku",  "tokens": 21100, "cost_usd": 0.01 },
+      { "agent": "spec-writer",   "model": "opus",   "tokens": 14130, "cost_usd": 0.07 }
+    ],
+    "artifacts": [
+      ".planning/phases/MYP-204-spec.md",
+      "src/services/EmailVerificationService.ts",
+      "src/services/__tests__/EmailVerificationService.test.ts"
+    ],
+    "self_healing_retries": 1,
+    "verifier_blocking_findings": 0
+  }
+  ```
+  </Tabs.Tab>
+  <Tabs.Tab>
+  ```json
+  {
+    "run_id": "20260701T143211-myp204",
+    "ticket_id": "MYP-204",
+    "status": "completed",
+    "agents": [
+      { "agent": "triage",      "model": "sonnet", "tokens": 8200   },
+      { "agent": "worker-dev",  "model": "sonnet", "tokens": 108700 },
+      { "agent": "spec-writer", "model": "opus",   "tokens": 14130  }
+    ],
+    "artifacts": [
+      "src/services/EmailVerificationService.ts",
+      "src/services/__tests__/EmailVerificationService.test.ts"
+    ]
+  }
+  ```
+  </Tabs.Tab>
+</Tabs>

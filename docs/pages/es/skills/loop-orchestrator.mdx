@@ -1,0 +1,51 @@
+# loop-orchestrator
+
+## Descripción general
+
+`loop-orchestrator` implementa el patrón Orchestrator-Workers: hace fan-out de N sub-tareas independientes a agentes workers en paralelo en una sola wave, recolecta sus artefactos intermedios y devuelve un resumen al runtime. Nunca sintetiza el entregable final — ese es el trabajo del spec-writer.
+
+## Cuándo se usa
+
+El triage selecciona este arquetipo cuando una fase contiene N sub-tareas independientes — investigación multi-fuente, comparaciones lado a lado, análisis por ítem — donde la salida del worker K no depende del worker K-1. Para pipelines secuenciales donde cada paso consume la salida del paso anterior, usá `loop-plan-execute`.
+
+## Entradas
+
+Un bloque de spec de fase del `plan.yml`:
+
+```yaml
+phase: research
+archetype: orchestrator-workers
+workers:
+  - id: w1
+    model: sonnet
+    prompt: "Investigar opción A — alcance, madurez, trade-offs."
+  - id: w2
+    model: sonnet
+    prompt: "Investigar opción B — alcance, madurez, trade-offs."
+artifact_dir: /tmp/loop-runs/<ts>/intermediates/research/
+acceptance:
+  - un .md por worker, 200-500 palabras
+  - cada uno debe citar al menos 2 fuentes
+budget:
+  max_total_tokens: 100000
+  per_worker_timeout_s: 300
+```
+
+## Salidas
+
+| Salida | Descripción |
+|---|---|
+| Archivos de artefactos | Un archivo por worker en `artifact_dir/<worker_id>.md` |
+| Resumen del runtime | Lista de rutas de artefactos + uso de tokens + warnings soft |
+
+Los workers que fallan se reintentan una vez con el modo de falla en el prompt. Los fallos persistentes se reportan al runtime — nunca se descartan silenciosamente.
+
+## Ejemplo
+
+```bash
+# El triage selecciona orchestrator-workers para:
+# "Comparar Vite, Turbopack y esbuild como build tools para nuestro frontend"
+#
+# Despacha 3 workers en paralelo → 3 artefactos de investigación
+# El spec-writer ensambla el documento de comparación final en la Phase 5
+```

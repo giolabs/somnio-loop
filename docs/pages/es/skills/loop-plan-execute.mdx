@@ -1,0 +1,55 @@
+# loop-plan-execute
+
+## Descripción general
+
+`loop-plan-execute` implementa el patrón Plan-Execute: un pipeline secuencial donde cada paso consume la salida del paso anterior. Usa TaskCreate/TaskUpdate como máquina de estado durable, soporta replanificación ante fallos de pasos, y devuelve todos los artefactos de pasos al runtime sin sintetizarlos.
+
+## Cuándo se usa
+
+El triage selecciona este arquetipo cuando los pasos tienen dependencias explícitas — el paso N necesita la salida del paso N-1 antes de poder ejecutarse. Ejemplos típicos: investigar → bosquejar → redactar → revisar, o extraer → transformar → cargar → validar. Para tareas independientes que pueden correr en paralelo, usá `loop-orchestrator`.
+
+## Entradas
+
+Un bloque de spec de fase del `plan.yml`:
+
+```yaml
+phase: pipeline
+archetype: plan-execute
+steps:
+  - id: s1
+    name: research
+    model: sonnet
+    prompt: "..."
+    output: /tmp/loop-runs/<ts>/intermediates/research.md
+    depends_on: []
+  - id: s2
+    name: build-matrix
+    model: sonnet
+    prompt: "Leer {{s1.output}}, extraer matriz de comparación estructurada."
+    output: /tmp/loop-runs/<ts>/intermediates/matrix.csv
+    depends_on: [s1]
+replan_policy: on_failure
+budget:
+  max_total_tokens: 80000
+```
+
+## Salidas
+
+| Salida | Descripción |
+|---|---|
+| Artefactos de pasos | Un archivo por paso en la ruta `output` configurada |
+| Estado de la task list | `completed` / `failed` / `skipped` por paso |
+| Log de replanificación | Presente cuando algún paso disparó una replanificación |
+| Uso de tokens | Acumulado a través de todos los pasos |
+
+Cuando un paso falla, un pequeño worker replanner decide: reintentar con un prompt ajustado, saltear el paso si el downstream sigue siendo viable, o escalar al usuario. Máximo 2 replans por fase.
+
+## Ejemplo
+
+```bash
+# El triage selecciona plan-execute para:
+# "Investigar nuestras 3 principales librerías de auth y escribir un doc de recomendación"
+#
+# s1: research.md  →  s2: matrix.csv  →  s3: recommendation.md
+# Cada paso lee el archivo del paso anterior antes de ejecutarse.
+```

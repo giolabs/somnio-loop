@@ -1,5 +1,6 @@
 import React from 'react'
 import { DocsThemeConfig } from 'nextra-theme-docs'
+import { LanguageSwitcher } from './components/LanguageSwitcher'
 
 const config: DocsThemeConfig = {
   logo: <span>somnio-loop</span>,
@@ -16,6 +17,9 @@ const config: DocsThemeConfig = {
       <meta name="description" content="somnio-loop — Autonomous agentic loop orchestration for Claude Code" />
     </>
   ),
+  navbar: {
+    extraContent: <LanguageSwitcher />,
+  },
 }
 
 export default config

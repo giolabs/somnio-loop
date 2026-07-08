@@ -1,0 +1,116 @@
+# Integraciones MCP
+
+El plugin no incluye sus propios servidores MCP. Descubre y se adapta a cualquier servidor MCP que tengas conectado a Claude Code en tiempo de ejecución.
+
+## Tres puntos de integración
+
+### 1. Fuente de tickets
+
+Obtiene el ticket completo cuando invocás `do PROJ-123`. Cae en modo manual (pedirte que pegues el texto) si no hay MCP disponible.
+
+| Fuente | Nombres de herramientas detectadas |
+|---|---|
+| Jira (Atlassian Remote) | `mcp__atlassian__getJiraIssue`, `mcp__atlassian__searchJiraIssuesUsingJql` |
+| Linear | `mcp__linear__get_issue`, `mcp__linear__list_issues` |
+| GitHub Issues | `mcp__github__get_issue`, `mcp__github__search_issues` |
+| GitLab Issues | `mcp__gitlab__get_issue` |
+
+### 2. Operaciones de PR / branch
+
+Crea el PR después de que se compone la Phase 3 (PR description). Con compuerta detrás de `pr_creation_gate`.
+
+| Host | Nombres de herramientas detectadas |
+|---|---|
+| GitHub | `mcp__github__create_pull_request`, `mcp__github__create_branch` |
+| GitLab | `mcp__gitlab__create_merge_request` |
+
+Los PRs siempre se abren como **draft**. El plugin nunca mergea, hace squash ni configura auto-merge.
+
+### 3. Notificaciones
+
+Opcional. Postea un resumen de corrida después de completar. Deshabilitado por default vía `notification_gate`.
+
+| Canal | Nombres de herramientas detectadas |
+|---|---|
+| Slack | `mcp__slack__send_message`, `mcp__slack__post_message` |
+| Microsoft Teams | `mcp__teams__send_message` |
+| Discord | `mcp__discord__send_message` |
+
+## Schema de configuración
+
+```yaml
+# .loop/config.yaml
+mcp_integrations:
+  ticket_source:
+    type: jira           # jira | linear | github_issues | gitlab_issues | none
+    cloud_id: ""         # Solo Jira — se descubre automáticamente si está en blanco
+    project_key: "PROJ"
+    required: false      # si true: abortar corrida cuando MCP no está disponible
+    update_status_on_complete: true
+    status_in_progress: "In Progress"
+    status_in_review: "In Review"
+    custom_field_acceptance_criteria: "customfield_10001"
+    comment_template: "default"
+
+  pr_target:
+    type: github         # github | gitlab | none
+    owner: "TU_ORG"
+    repo: "TU_REPO"
+    base_branch: "develop"
+    draft_default: true
+    pr_template_path: ".github/pull_request_template.md"
+    github_account: ""   # usuario de gh CLI a usar para crear el PR (si difiere del activo)
+
+  notification:
+    type: slack          # slack | teams | discord | none
+    channel: "#dev-loops"
+    notify_on: [completed, partial, aborted]
+    summary_template: "default"
+```
+
+> Los valores de tokens y credenciales se leen de la configuración de tu propio servidor MCP — nunca se guardan en `.loop/config.yaml`.
+
+## Jira / Atlassian Remote MCP
+
+**Flujo de obtención de tickets:**
+
+1. Verificar `cloud_id` en `config.yaml`. Si está en blanco, llamar `getAccessibleAtlassianResources()` para resolverlo y guardarlo en `config.yaml` (una sola vez).
+2. Llamar `getJiraIssue(cloudId, "PROJ-123")` — devuelve summary, description, custom fields.
+3. Parsear `summary` → título, `description` → cuerpo, `customfield_*` → criterios de aceptación.
+4. Sintetizar en un string `ticket_text` unificado.
+
+**Actualización de estado post-corrida:**
+
+Después de la Phase 7 (actualización de STATE), si `update_status_on_complete: true`:
+
+1. Llamar `editJiraIssue` para establecer el estado en `status_in_review`.
+2. Llamar `addCommentToJiraIssue` con resumen de corrida, tabla de tokens por agente, link al PR y link al ADR.
+3. El fallo de actualización de estado no es fatal — se registra como warning.
+
+## GitHub Issues + PRs
+
+```
+Obtención de ticket:  mcp__github__get_issue(owner, repo, issue_number)
+Creación de PR:       mcp__github__create_pull_request(owner, repo, title, body, head, base, draft=true)
+Lista de PRs:         mcp__github__list_pull_requests  (para detección de conflictos ADR)
+```
+
+## Linear
+
+```
+Obtención de ticket:  mcp__linear__get_issue(id)
+Actualización estado: mcp__linear__update_issue(id, fields)
+Comentario:           mcp__linear__create_comment(issueId, body)
+```
+
+## Descubrimiento en tiempo de ejecución
+
+En Phase -1, el plugin ejecuta `ToolSearch` para cada integración declarada y cachea los nombres de herramientas descubiertos. Si una integración requerida no está disponible, la corrida aborta con un mensaje claro. Las integraciones opcionales caen en modo manual silenciosamente.
+
+## Reglas fijas
+
+1. Los PRs siempre se abren como draft. Los usuarios marcan "ready for review" manualmente.
+2. `gh pr merge`, `git push origin main` y cualquier llamada equivalente a merge nunca se hacen.
+3. El status del ticket nunca se establece en "Done" automáticamente — "In Review" es el máximo.
+4. La limpieza de branches nunca se realiza de forma autónoma.
+5. Si no hay MCP configurado, el plugin cae en modo de texto de ticket manual sin ningún cambio de comportamiento.

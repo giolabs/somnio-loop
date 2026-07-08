@@ -1,0 +1,17 @@
+# Plan-Execute
+
+## Cuándo lo selecciona el triage
+
+El triage selecciona este arquetipo cuando el ticket describe un pipeline secuencial donde cada paso consume la salida del paso anterior. La característica distintiva es el flujo de datos explícito: extraer → transformar → almacenar, o escanear → clasificar → reportar. Los pasos no pueden paralelizarse porque el paso N+1 requiere el resultado del paso N.
+
+## Cómo funciona
+
+El triage produce un `plan.yml` con fases ordenadas e inputs/outputs declarados por fase. El runtime ejecuta las fases de a una, pasando el artefacto de salida de cada fase como el input nombrado de la siguiente. Si una fase falla, el pipeline se detiene en ese punto — los outputs de fases anteriores se preservan en `.loop/` para inspección y reanudación.
+
+El artefacto final se ensambla por el spec-writer una vez que todas las fases completan, combinando la cadena de outputs en un único entregable coherente.
+
+## Ejemplo de ticket real
+
+```bash
+do "Extraer todos los comentarios TODO y FIXME del codebase, agruparlos por archivo y severidad, y escribir un backlog priorizado en Markdown con estimaciones de esfuerzo"
+```

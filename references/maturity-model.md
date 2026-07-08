@@ -57,6 +57,28 @@ After picking a level, the triage MUST tell the user which level was chosen and 
 
 User can downshift via `AskUserQuestion` ("Want me to run L1 instead?"). Upshift requires explicit confirmation.
 
+## Execution context: `interactive` vs `headless` (v0.9.1)
+
+The maturity levels were originally designed for headless/batch contexts. In Claude Code's interactive CLI, the user approves every tool call — which changes the semantics of the write gates significantly.
+
+| Context | Detection | L1 behavior | L2 behavior | L3 behavior |
+|---|---|---|---|---|
+| `interactive` | Claude Code CLI, desktop app, IDE extension — user is present and approves tool calls | All writes require user approval via Claude Code's built-in tool approval UI. The UI approval IS the gate — no `AskUserQuestion` needed. The plugin may proceed with writes because the user can reject them per call. | Per-write approval via Claude Code's tool approval (already enforced by the host). `AskUserQuestion` is redundant. | Full autonomy if user has set "always allow". |
+| `headless` | CI/CD, batch job, background agent, unattended run — no user present | Report only. Zero writes. Any write attempt is skipped with a warning logged to `run-log.md`. | `AskUserQuestion` pauses and blocks until human input arrives (or times out per budget config). | Full autonomy — writes proceed without gates. |
+
+**Why this distinction matters:** L1 in interactive mode should NOT block the run — the user approves or rejects each file write via the Claude Code approval UI, which already satisfies the "human in the loop" requirement. Treating L1 interactive the same as L1 headless (no writes) creates friction on normal first-run dev tickets (observed in v0.9.0 run MH-1744).
+
+**Configuring execution_context:**
+
+```yaml
+# .loop/config.yaml
+autonomy:
+  preset: minimal
+  execution_context: interactive  # interactive | headless. Default: interactive.
+```
+
+Triage reads this from `config.yaml` and propagates it in `plan.yml`. The runtime uses it to decide whether write gates are handled by the host approval UI or by `AskUserQuestion`.
+
 ## Phased rollout pattern (Cobus's advice)
 
 When using the plugin in a new project for the first time:

@@ -1,0 +1,38 @@
+# loop-adr
+
+## Descripción general
+
+`loop-adr` genera un nuevo Architecture Decision Record (ADR) para tickets que involucran una decisión arquitectónica significativa. Realiza análisis del codebase, presenta trade-offs, detecta conflictos con PRs/MRs abiertos y deriva criterios de aceptación de los tests existentes — todo antes de que se escriba una sola línea de implementación.
+
+## Cuándo se usa
+
+Se invoca automáticamente por `loop-runtime` como Phase 0 cuando el triage clasifica un ticket como contenedor de una decisión arquitectónica: adopción de nueva tecnología, diseño de API, cambios en el modelo de datos, decisiones de infraestructura, o preocupaciones transversales. El usuario nunca lo llama directamente.
+
+## Entradas
+
+| Campo | Descripción |
+|---|---|
+| `ticket` | Texto verbatim del ticket |
+| `title` | Frase imperativa corta (inferida si no se provee) |
+| `remote_adrs_url` | URL opcional a `docs/adr/` de otro repo para referencia de estilo |
+| `repo_url` | URL opcional del repo para escaneo de conflictos con PRs abiertos |
+| `output_lang` | `es` o `en` — heredado de la detección del proyecto, nunca se pregunta |
+| `run_dir` | Directorio de intermedios (`/tmp/loop-runs/<ts>/`) |
+
+## Salidas
+
+| Salida | Ubicación |
+|---|---|
+| Archivo ADR | `<repo_root>/docs/adr/ADR-NNN-<slug>.md` |
+| Reporte de fase | `<run_dir>/loop-adr-report.md` |
+
+El ADR se alimenta directamente en `loop-generate-spec`: su sección `## Decision` se convierte en el §10 del spec (bloqueado), sus criterios de aceptación van al §8, y sus gaps técnicos pueblan el §4 como prerrequisitos bloqueantes.
+
+## Ejemplo
+
+```bash
+# Se dispara automáticamente cuando el triage detecta una decisión arquitectónica, ej.:
+# "Adoptar Redis para caché de sesiones distribuidas — reemplazar el store en memoria actual"
+#
+# Produce: docs/adr/ADR-007-use-redis-for-session-caching.md
+```

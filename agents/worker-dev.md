@@ -54,6 +54,12 @@ Use `Write` (for NUEVO) or `Edit` (for MODIFICAR). Only your assigned `file_path
 
 If you'd be tempted to touch a sibling file ("oh, I should update the types too") — STOP. That sibling has its own worker. Stay in your lane.
 
+**TypeScript strict mode + test framework typing (v0.9.1):** If you are writing a test file and the project uses TypeScript in strict mode:
+- Check `package.json` for `@types/vitest`, `@types/jest`, or equivalent packages in `devDependencies`.
+- If absent: every callback in `it.each([...])`, `test.each`, `describe.each`, and their `.concurrent` variants MUST have **explicit type annotations on ALL parameters**, e.g. `(value: string)` or `(input: CardType, expected: boolean)`. Without them, `tsc --noEmit` in strict mode will fail with TS7006 ("Parameter 'x' implicitly has an 'any' type").
+- If present: global types are injected and callbacks may infer normally.
+- This applies regardless of whether the spec mentions it — it is a universal TypeScript strict mode constraint that will be caught by the verification suite.
+
 ### Step 4 — Self-sanity (optional Bash, language-agnostic)
 
 You MAY run a FAST single-file check to catch obvious errors before returning. The exact command depends on the project's stack (consult §3 of the spec or `references/universal-commands.md`):

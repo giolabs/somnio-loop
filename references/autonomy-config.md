@@ -18,23 +18,27 @@ Lives at `<repo_root>/.loop/config.yaml`. Created from template on first run. Ed
 
 ## Minimal viable config
 
-If your project uses Jira + GitHub, this 10-line config is complete:
+If your project uses Jira + GitHub, this config is complete:
 
 ```yaml
 # .loop/config.yaml
 autonomy:
   preset: minimal
+  execution_context: interactive  # interactive (Claude Code CLI, user present)
+                                  # headless (CI/CD, batch, no user present)
 
 mcp_integrations:
   ticket_source:
     type: jira
     project_key: "MH"
+    cloud_id: ""          # auto-populated on first run (getAccessibleAtlassianResources)
 
   pr_target:
     type: github
     owner: "your-org"
     repo: "your-repo"
     base_branch: "develop"
+    github_account: ""    # optional: gh CLI username to switch to before PR creation
 ```
 
 Change `preset: minimal` to `ownership` if you want to be consulted on architectural and risk decisions.
@@ -331,7 +335,7 @@ gates:
                                                                     # records in STATE, doesn't ask
 ```
 
-**Use when:** trivial tickets you've run dozens of times, batch processing, after a calibration period of `balanced` runs.
+**Use when:** trivial tickets you've run dozens of times, CI/CD pipelines (set `execution_context: headless`), batch processing multiple tickets, after a calibration period of `ownership` runs.
 
 ### `balanced` — default
 

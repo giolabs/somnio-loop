@@ -1,0 +1,21 @@
+# Generate-Spec
+
+## Cuándo lo selecciona el triage
+
+El triage selecciona este arquetipo cuando un ticket de desarrollo implica trabajo de código pero aún no existe un contrato formal. La señal es un ticket que describe comportamiento deseado — un feature, un componente, un endpoint, una migración — sin especificar los archivos exactos, interfaces o criterios de aceptación necesarios para implementarlo de forma segura. El triage se niega a enviar workers al código sin un spec.
+
+## Cómo funciona
+
+Un pipeline de fase única ejecuta tres agentes en secuencia:
+
+1. **spec-refiner** (Haiku) escanea el ticket y el contexto del codebase existente, luego completa la plantilla de spec de 20 secciones sección por sección, marcando los gaps que no puede resolver con la información disponible.
+2. **spec-validator** (Sonnet) revisa el borrador y devuelve uno de tres veredictos: `PASS`, `WARNINGS`, o `BLOCK`. Un `BLOCK` dispara el `spec_clarification_gate`.
+3. Con `PASS` o `WARNINGS`, el spec se escribe en `.loop/` y se entrega como contrato para la fase `self-healing` subsiguiente.
+
+La salida es un spec legible por máquina que los agentes worker-dev consumen directamente — no se requiere reformateo humano.
+
+## Ejemplo de ticket real
+
+```bash
+do "Quiero agregar un toggle de modo oscuro al dashboard — debería persistir la preferencia del usuario entre sesiones"
+```

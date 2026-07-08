@@ -1,0 +1,123 @@
+# Integración Git Flow
+
+El plugin clasifica cada ticket de escritura de código en uno de ocho tipos y aplica automáticamente el nombrado de branch, el branch base y el target de PR correspondientes.
+
+## Tipos de ticket de un vistazo
+
+| Tipo | Patrón de branch | Base | PR target | Prefijo de commit |
+|---|---|---|---|---|
+| `feature` | `feature/{ticket_id}-{slug}` | `develop` | `develop` | `feat:` |
+| `bugfix` | `bugfix/{ticket_id}-{slug}` | `develop` | `develop` | `fix:` |
+| `hotfix` | `hotfix/{ticket_id}-{slug}` | `main` | `main` + back-merge a `develop` | `fix:` |
+| `release` | `release/{version}` | `develop` | `main` + back-merge a `develop` | `chore(release):` |
+| `chore` | `chore/{ticket_id}-{slug}` | `develop` | `develop` | `chore:` |
+| `docs` | `docs/{ticket_id}-{slug}` | `develop` | `develop` | `docs:` |
+| `refactor` | `refactor/{ticket_id}-{slug}` | `develop` | `develop` | `refactor:` |
+| `spike` | `spike/{ticket_id}-{slug}` | `develop` | `develop` | `chore(spike):` |
+
+Los slugs son kebab-case en inglés, máximo 50 caracteres.
+
+## Señales de clasificación
+
+El triage evalúa las señales de arriba hacia abajo; gana la primera coincidencia.
+
+| Tipo | Señales clave |
+|---|---|
+| `hotfix` | "hotfix", "P0", "P1", "production down", "URGENTE", corrección de branch necesaria en main |
+| `release` | "release v", "cortar release", "preparar release", título coincide con `release\s+v?\d` |
+| `bugfix` | "fix", "bug", "regresión", "resolver" — sin urgencia de producción |
+| `docs` | Solo verbos de docs + solo rutas `.md`/`docs/` mencionadas |
+| `chore` | Bumps de dependencias, configuración de CI, cambios de tooling, sin lógica de aplicación |
+| `refactor` | "refactor", "renombrar", "extraer", "sin comportamiento nuevo" |
+| `spike` | "spike", "POC", "investigar", "prototipo", "descartable" |
+| `feature` | Cualquier otra cosa con verbos de nueva funcionalidad (`agregar`, `implementar`, `build`) |
+
+## Configuración
+
+```yaml
+# .loop/config.yaml
+git_flow:
+  enabled: true
+  base_branch: develop
+  main_branch: main
+
+  branch_patterns:
+    feature:  "feature/{ticket_id}-{slug}"
+    bugfix:   "bugfix/{ticket_id}-{slug}"
+    hotfix:   "hotfix/{ticket_id}-{slug}"
+    release:  "release/{version}"
+    chore:    "chore/{ticket_id}-{slug}"
+    docs:     "docs/{ticket_id}-{slug}"
+    refactor: "refactor/{ticket_id}-{slug}"
+    spike:    "spike/{ticket_id}-{slug}"
+
+  commit_message:
+    style: conventional   # conventional | simple | none
+
+  follow_up:
+    hotfix_back_merge_to_develop: true
+    release_back_merge_to_develop: true
+```
+
+## Estrategias alternativas
+
+**GitHub Flow** (solo main):
+
+```yaml
+git_flow:
+  base_branch: main
+  main_branch: main
+  pr_targets:
+    feature: main
+    bugfix: main
+    hotfix: main
+    # ... todos los tipos → main
+  follow_up:
+    hotfix_back_merge_to_develop: false
+    release_back_merge_to_develop: false
+```
+
+**Trunk-based development** (sin prefijos de tipo de branch):
+
+```yaml
+git_flow:
+  base_branch: main
+  branch_patterns:
+    feature:  "{ticket_id}-{slug}"
+    bugfix:   "{ticket_id}-{slug}"
+    # ... todos los tipos usan patrón simple
+```
+
+## Cómo el plugin crea branches
+
+El plugin nunca toca tu HEAD actual. Usa un worktree dedicado para todas las escrituras y verifica el invariante antes y después de la corrida.
+
+```
+1. Snapshot del HEAD del usuario y el branch actual
+2. Resolver el branch base para este tipo de ticket
+3. Crear nuevo branch apuntando a la base (sin checkout)
+4. Abrir un worktree de merge dedicado en el nuevo branch
+5. Aplicar el diff de cada worker en el worktree de merge
+6. Commit con mensaje conventional
+7. Eliminar todos los worktrees
+8. Verificar que el HEAD del usuario no cambió — abortar con INVARIANT VIOLATED si no
+```
+
+## Formato de commit conventional
+
+```
+feat(PROJ-127): agregar caché Redis para estado de sesión
+
+Introduce almacenamiento de sesiones respaldado por Redis con evicción basada en TTL.
+Reemplaza el store de sesiones en memoria anterior.
+
+Closes PROJ-127
+```
+
+## Seguridad de hotfix
+
+Incluso con `autonomy: minimal`, el plugin siempre muestra una confirmación antes de crear un branch `hotfix/*` desde main. Los hotfixes tocan rutas de producción y esta fricción es no negociable.
+
+## Deshabilitar Git Flow
+
+Establecé `git_flow.enabled: false` para volver al modelo de branch más simple `loop/<ticket_id>` sin clasificación por tipo.

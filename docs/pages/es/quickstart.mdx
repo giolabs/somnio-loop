@@ -1,0 +1,67 @@
+# Inicio rápido
+
+Poné somnio-loop a funcionar en menos de cinco minutos. Consultá [CHANGELOG.md](https://github.com/giosomniodev/somnio-loop/blob/main/CHANGELOG.md) para la versión del release actual.
+
+## Requisitos previos
+
+Antes de instalar, confirmá que tenés lo siguiente:
+
+- **Claude Code CLI** — instalado y autenticado
+- **Node.js 20 o superior**
+- **pnpm o npm** (para cualquier tooling del proyecto)
+
+## Instalación
+
+Ejecutá estos tres comandos una sola vez. No se requiere configuración específica por proyecto para empezar.
+
+```bash
+# 1) Registrar la fuente del marketplace
+claude plugin marketplace add giosomniodev/somnio-loop
+
+# 2) Instalar el plugin
+claude plugin install somnio-loop@somnio-loop
+
+# 3) Confirmar que está activo
+claude plugin list | grep somnio-loop
+```
+
+## Primera ejecución
+
+Abrí Claude Code dentro de cualquier directorio de proyecto e invocá el comando `do` con un prompt en texto plano:
+
+```
+somnio-loop:do "Investigá los últimos 3 releases de TypeScript y escribí un resumen de 300 palabras."
+```
+
+El plugin muestra su configuración resuelta de inmediato:
+
+```
+🎚 Readiness level: L1 (report-only) — primera corrida en este repo.
+🎛 Autonomy: balanced (default from .loop/config.yaml)
+```
+
+A partir de ahí ejecuta el triage, hace fan-out de workers, corre el verifier y entrega un artefacto consolidado con una tabla de consumo por agente. Para un prompt de investigación de este tamaño, esperá aproximadamente 3–5 minutos y $0.30–$0.50 USD.
+
+## Configuración mínima
+
+En la primera corrida, somnio-loop crea `.loop/config.yaml` automáticamente. Solo necesitás editarlo para conectar un tracker de tickets o cambiar el preset de autonomía. Una configuración completa y funcional se ve así:
+
+```yaml
+# .loop/config.yaml
+autonomy:
+  preset: minimal   # o ownership, o custom
+
+mcp_integrations:
+  ticket_source:
+    type: jira
+    project_key: "PROJ"
+  pr_target:
+    type: github
+    owner: "tu-org"
+    repo: "tu-repo"
+    base_branch: "develop"
+```
+
+El preset define todos los defaults de las compuertas — nunca necesitás especificar los valores de cada compuerta individualmente a menos que elijas `preset: custom`. La observabilidad (líneas de superficie, tabla de consumo por agente, run report, actualizaciones del STATE) siempre está activa independientemente del preset.
+
+Para la referencia completa de compuertas y el comportamiento por preset, consultá [Autonomía y Compuertas](../references/autonomy-config).

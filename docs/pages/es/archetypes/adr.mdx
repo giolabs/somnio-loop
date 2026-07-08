@@ -1,0 +1,32 @@
+# ADR
+
+## Cuándo lo selecciona el triage
+
+El triage selecciona este arquetipo cuando el ticket implica una decisión arquitectónica en lugar de (o además de) un cambio de código. Las señales de disparo incluyen:
+
+- Verbos de acción: *adoptar*, *migrar*, *reemplazar*, *cambiar a*, *alejarse de*
+- Introducción de una nueva tecnología, librería o componente de infraestructura que no está actualmente en el codebase
+- Cambios en modelos de datos, contratos de API o límites entre servicios
+- Cambios en la topología de infraestructura (capa de caché, cola, backend de storage, proveedor de auth)
+
+El triage puede apilar el arquetipo ADR antes de `generate-spec` y `self-healing` cuando el ticket implica tanto una decisión como una implementación.
+
+## Cómo funciona
+
+El agente `adr-author` (Sonnet) ejecuta un flujo de 12 pasos:
+
+1. Lee el ticket y clasifica el tipo de decisión.
+2. Escanea el codebase y `.rules`/`AGENTS.md`/`CLAUDE.md` en busca de restricciones existentes que incidan en la decisión.
+3. Enumera alternativas consideradas (al menos tres).
+4. Analiza la superficie de diff para detectar conflictos con PRs en ramas abiertas.
+5. Evalúa cada alternativa contra las convenciones documentadas del proyecto.
+6. Selecciona una recomendación y registra el razonamiento.
+7. Escribe el ADR en el formato estándar bajo `docs/decisions/` (o la ruta que usa tu proyecto).
+
+Si la opción seleccionada entra en conflicto con una regla documentada, se dispara el `adr_rule_violation_gate` — esta compuerta no puede configurarse en `proceed`. Si el análisis del diff revela alto potencial de conflicto, se dispara el `adr_conflict_gate` según tu preset de autonomía.
+
+## Ejemplo de ticket real
+
+```bash
+do "Usar Redis para caché de sesiones en lugar del store en memoria actual — necesitamos que las sesiones sobrevivan reinicios de pods"
+```

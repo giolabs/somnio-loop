@@ -1,0 +1,101 @@
+# Tipos de Manifest
+
+El plugin usa manifests de dependencias para descubrir el stack tecnológico del proyecto. La detección recorre el repo hasta 3 niveles de profundidad, saltando `node_modules`, `vendor`, `.venv`, `target`, `build`, `.gradle` y `.dart_tool`.
+
+## Manifests por ecosistema
+
+### Node / JavaScript / TypeScript
+
+| Archivo | Rol |
+|---|---|
+| `package.json` | Universal |
+| `pnpm-workspace.yaml` | Monorepo pnpm |
+| `turbo.json` | Turborepo |
+| `nx.json` + `workspace.json` | Monorepo Nx |
+| `bun.lockb` | Pista de runtime Bun |
+| `deno.json` / `deno.jsonc` | Deno |
+
+### Python
+
+| Archivo | Rol |
+|---|---|
+| `pyproject.toml` | Proyectos modernos (poetry, hatch, pdm) |
+| `setup.py` / `setup.cfg` | setuptools más antiguo |
+| `requirements.txt` / `requirements-*.txt` | deps fijados con pip |
+| `Pipfile` | pipenv |
+| `environment.yml` | conda |
+
+### Go / Rust / Ruby
+
+| Archivo | Ecosistema |
+|---|---|
+| `go.mod` | Módulos Go |
+| `Cargo.toml` / `rust-toolchain.toml` | Rust |
+| `Gemfile` / `*.gemspec` / `Rakefile` | Ruby |
+
+### JVM (Java / Kotlin / Scala / Clojure)
+
+| Archivo | Rol |
+|---|---|
+| `pom.xml` | Maven |
+| `build.gradle` / `build.gradle.kts` | Gradle |
+| `build.sbt` | Scala SBT |
+| `project.clj` / `deps.edn` | Clojure |
+
+### .NET
+
+| Archivo | Rol |
+|---|---|
+| `*.csproj` / `*.fsproj` / `*.sln` | Proyecto y solución |
+| `Directory.Build.props` | Gestión central de paquetes |
+| `global.json` | Pin de versión del SDK |
+
+### Mobile y cross-platform
+
+| Archivo | Ecosistema |
+|---|---|
+| `pubspec.yaml` | Flutter / Dart |
+| `melos.yaml` | Monorepo Dart (Melos) |
+| `Package.swift` | SwiftPM (iOS) |
+| `Podfile` | CocoaPods (iOS) |
+| `app.json` / `app.config.ts` | React Native / Expo |
+
+### Infraestructura
+
+| Archivo | Herramienta |
+|---|---|
+| `Dockerfile` / `compose.yaml` | Docker |
+| `terraform/**/*.tf` | Terraform |
+| `helm/Chart.yaml` | Helm |
+| `cdk.json` | AWS CDK |
+| `Pulumi.yaml` | Pulumi |
+| `ansible.cfg` | Ansible |
+
+### CI
+
+| Archivo | Plataforma |
+|---|---|
+| `.github/workflows/*.yml` | GitHub Actions |
+| `.gitlab-ci.yml` | GitLab CI |
+| `Jenkinsfile` | Jenkins |
+| `azure-pipelines.yml` | Azure Pipelines |
+| `.circleci/config.yml` | CircleCI |
+
+## Lógica de clasificación
+
+Después de recolectar manifests, el plugin determina `project_type` y `sub_type`:
+
+```
+pubspec.yaml presente → Flutter
+package.json con deps react-native/expo → React Native
+package.json con react/next/vue/svelte → Frontend SPA
+package.json con nest/express/fastify → Backend Node
+go.mod → Go
+Cargo.toml → Rust
+pubspec.yaml (sin dirs mobile) → Dart
+pom.xml / build.gradle → JVM
+```
+
+## Sin manifest encontrado
+
+Si no se encuentra ningún manifest reconocido, el plugin no adivina el stack. Te pide que declares el stack en una sección `## Stack` dentro de `CLAUDE.md` antes de continuar.

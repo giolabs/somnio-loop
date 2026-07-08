@@ -43,6 +43,7 @@ ticket_summary: "<one-line restatement>"
 readiness_level: L1
 readiness_rationale: "Initial assessment, refining..."
 autonomy: balanced
+execution_context: interactive  # interactive | headless — from config.yaml; default interactive
 ticket_type: feature   # or whatever obvious from verbs
 slug: <kebab-case-short-title>
 phases:
@@ -92,6 +93,7 @@ phases:
     workers:
       - id: w1
         model: sonnet  # haiku | sonnet | opus
+        thinking_budget_tokens: 0  # 0 = off; 4000–16000 for complex reasoning (see model ladder)
         prompt: "<narrow scope, one bundler, output format, save path>"
       # ... up to N
     artifact_dir: "/tmp/loop-runs/<ts>/intermediates/research/"
@@ -117,8 +119,11 @@ verification:
   agent: verifier
   model: haiku
 synthesis:
-  agent: spec-writer
-  model: opus
+  # Document tickets (research, docs, spike, ADR): agent: spec-writer
+  # Development tickets (feature, bugfix, hotfix, chore, refactor) with code final_artifacts: agent: workers
+  # Mixed tickets: split final_artifacts into two groups and use spec-writer for doc portion only
+  agent: spec-writer | workers   # CHOOSE one based on ticket_type + artifact file extensions
+  model: opus                    # only when agent: spec-writer; omit when agent: workers
   produces: ["<final artifact paths>"]
 budget_total:
   max_tokens: 250000
@@ -219,6 +224,16 @@ Apply this ladder strictly. Default to the cheapest model that still works.
 
 The spec-writer is the ONLY agent that runs Opus. Never assign Opus to a worker. Never assign Opus to yourself. Code-writing workers (`worker-dev`) are always Sonnet — Opus is overkill for single-file implementation.
 
+**Extended thinking (v0.9.1):** Set `thinking_budget_tokens` on Sonnet phases/workers that require deep reasoning. The runtime honors this flag when dispatching sub-agents.
+
+| Situation | `thinking_budget_tokens` |
+|---|---|
+| Complex architectural analysis, multi-file dependency graph resolution | `8000` |
+| Ambiguous spec gaps needing deep inference, ADR with >5 conflicting PRs | `4000` |
+| Routine code implementation, search/grep tasks, format conversion, spec validation | `0` (off) |
+
+Never set `thinking_budget_tokens` on Haiku workers — unsupported at that model tier. Never assign it to the verifier. The goal is targeted deep reasoning at the decision choke-points, not blanket extended thinking.
+
 ### Tech-agnostic prompt construction (v0.4 mandatory)
 
 When you write prompts for workers (orchestrator-workers fan-out), NEVER assume:
@@ -294,4 +309,6 @@ Verify your plan.yml answers all of these:
 11. **Did you run the 10 anti-patterns checklist from `references/anti-patterns-checklist.md`?** Auto-fix what's auto-fixable; surface what isn't.
 12. **Is the plan tech-AGNOSTIC?** It must NOT assume Node/Jest/TypeScript or any specific stack. Verification commands come from spec §8 (which the spec phase discovers from the project's actual task runner). Code examples in worker prompts come from §6's `follow_example` — never from your own assumptions about what the stack is.
 
-If yes to all 12, write the file and return its path to the orchestrator. Cap your text reply at 150 words — the file is the artifact, not the chat reply.
+13. **Did you set `synthesis.agent` correctly?** For `ticket_type: feature | bugfix | hotfix | chore | refactor` with code final artifacts (`.ts`, `.dart`, `.py`, `.go`, `.rs`, etc.): set `agent: workers`. For `ticket_type: research | docs | spike` or document artifacts: set `agent: spec-writer`. Wrong routing dispatches the most expensive model on already-written code — or skips synthesis entirely for documents.
+
+If yes to all 13, write the file and return its path to the orchestrator. Cap your text reply at 150 words — the file is the artifact, not the chat reply.

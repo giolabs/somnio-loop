@@ -1,0 +1,107 @@
+# State Spine
+
+El plugin mantiene todo el estado persistente dentro de un único directorio en la raíz de tu repo: `.loop/`. Cada archivo es Markdown o YAML plano — legible y diffable sin el plugin.
+
+## Estructura del directorio
+
+```
+<repo_root>/.loop/
+├── state.md            # Estado durable de corridas — se lee al inicio, se actualiza al final
+├── run-log.md          # Historial append-only, una entrada por corrida
+├── budget.md           # Límites diarios/semanales y kill switch
+├── config.yaml         # Presets de autonomía y comportamiento de compuertas
+├── traces/             # Trazas JSON legibles por máquina, una por corrida
+│   └── <ts>-<ticket_hash>.json
+└── plans/              # plan.yml archivado por corrida
+    └── <ts>-<ticket_hash>.yml
+```
+
+Si `.loop/` no existe cuando comienza una corrida, el plugin lo crea desde plantillas.
+
+## `state.md`
+
+Registra ítems de alta prioridad esperando input humano, un watch list y un snapshot de convenciones usado como caché rápido entre corridas.
+
+```markdown
+# Loop state — <nombre-proyecto>
+
+Last run: <ISO-8601>
+Last status: completed | partial | aborted
+Last readiness level: L1 | L2 | L3
+
+## High Priority (waiting on human)
+
+- [ ] **PROJ-127** — Spike de caché Redis bloqueado en aprobación de infra. Last touched: 2024-01-15T10:00Z.
+
+## Watch List
+
+- **PROJ-128** — Refactor de auth. Reason: conflicto de ADR con PR abierto #45.
+
+## Conventions snapshot
+
+- project_type: backend
+- sub_type: nestjs
+- task_runner: Makefile
+- verification:
+    lint: make lint
+    typecheck: make typecheck
+    test: make test
+```
+
+## `run-log.md`
+
+Append-only. El plugin nunca edita ni elimina entradas existentes.
+
+```markdown
+## 2024-01-15T10:32:00Z — PROJ-127
+
+- **Status:** completed
+- **Readiness level:** L2
+- **Duration:** 4m 12s
+- **Tokens:** 84.300 total
+- **Cost estimate:** $0.42
+- **Artifacts produced:**
+  - src/cache/redis-session.ts
+  - docs/adr/ADR-001-redis-session.md
+- **Self-healing retries:** 1
+- **Trace:** .loop/traces/20240115T103200-proj127.json
+```
+
+## `budget.md`
+
+```yaml
+daily:
+  max_tokens: 500000
+  max_cost_usd: 5.00
+  max_runs: 20
+weekly:
+  max_tokens: 2000000
+  max_cost_usd: 25.00
+per_run:
+  max_tokens: 250000
+  max_cost_usd: 3.00
+  max_duration_seconds: 1800
+kill_switch:
+  enabled: false
+  reason: ""
+  paused_until: ""    # timestamp ISO-8601 para reanudación automática
+denylist_paths:
+  - .env
+  - .env.*
+  - secrets/
+  - infra/production/
+```
+
+Establecer cualquier límite en `0` deshabilita el plugin hasta reseteo manual. Establecer `kill_switch.enabled: true` muestra el motivo en el chat y se niega a correr.
+
+## Cómo usa el plugin `.loop/`
+
+| Momento | Acción |
+|---|---|
+| Inicio de corrida | Leer `state.md`, cola de `run-log.md` (últimas 10), y `budget.md`. Abortar si el budget se agotó o el kill switch está activo. |
+| Después de emitir el plan | Validar todas las rutas de escritura de workers contra `denylist_paths`. Rechazar el plan si alguna ruta coincide. |
+| Fin de corrida | Agregar entrada a `run-log.md`. Actualizar `state.md`. Guardar archivos `trace.json` y `plan.yml`. |
+
+## Control de versiones
+
+Agregá `.loop/` al `.gitignore` para uso individual. Committealo si querés compartir el historial de corridas y el estado entre un equipo — el schema es texto plano review-friendly.

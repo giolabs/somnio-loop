@@ -1,0 +1,45 @@
+# do
+
+## Descripción general
+
+El skill `do` es el punto de entrada principal del plugin somnio-loop. Acepta un ticket o descripción de tarea y orquesta el loop agéntico completo de punta a punta — desde el triage y la planificación hasta la implementación, la verificación y la entrega del artefacto final.
+
+## Cuándo usarlo
+
+- El usuario pega un ticket de Jira/Linear/GitHub o una descripción de tarea en texto libre
+- El usuario dice `/loop:do`, "corré esto de punta a punta" o "ejecutá el flujo completo"
+- Cualquier solicitud que implique un entregable de múltiples fases delegado a ejecución autónoma
+
+NO usar para búsquedas de un solo paso o ediciones rápidas — esas se ejecutan directamente sin el overhead del loop.
+
+## Entradas
+
+| Entrada | Descripción |
+|---|---|
+| Texto del ticket | Cuerpo completo del ticket, lista de bullets, o ID de ticket bare (ej. `TKT-123`) |
+| `.loop/config.yaml` | Preset de autonomía y configuración de compuertas |
+| `.loop/state.md` | Contexto de corridas previas y watch list |
+| `--autonomy=<preset>` | Override por corrida opcional al final del ticket |
+
+## Salidas
+
+| Salida | Ubicación |
+|---|---|
+| Entregable(s) final(es) | Carpeta de outputs del usuario |
+| `run-report.md` | Junto a cada artefacto |
+| `plan.yml` | `.loop/plans/<ts>-<ticket_hash>.yml` |
+| `trace.json` | `.loop/traces/<ts>-<ticket_hash>.json` |
+| Run-log actualizado | `.loop/run-log.md` |
+
+El mensaje final en el chat siempre incluye un resumen ejecutivo y una tabla de consumo por agente (modelo, invocaciones, tiempo, tokens, costo).
+
+## Ejemplo
+
+```bash
+/loop:do TKT-421 — Agregar rate limiting a la API pública
+
+Criterios de aceptación:
+- 429 devuelto después de 100 req/min por API key
+- Headers X-RateLimit-* en cada respuesta
+- Los tests de integración existentes siguen pasando
+```

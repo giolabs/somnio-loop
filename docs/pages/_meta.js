@@ -4,4 +4,7 @@ export default {
   archetypes: 'Archetypes',
   references: 'References',
   examples: 'Examples',
+  es: {
+    display: 'hidden',
+  },
 }

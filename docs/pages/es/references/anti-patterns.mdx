@@ -1,0 +1,93 @@
+# Anti-Patrones
+
+El agente de triage ejecuta este checklist contra cada `plan.yml` emitido antes del despacho. Un anti-patrón que coincide o dispara una corrección automática o hace una pregunta al usuario.
+
+## Los 10 anti-patrones
+
+### 1. El mismo agente implementa y verifica
+
+`worker-dev` escribe código. `verifier` lo audita. Siempre deben ser sub-agentes separados con system prompts y asignaciones de modelo distintas.
+
+**Flag:** cualquier fase donde el mismo `agent_id` tanto escribe artefactos como ejecuta verificación.
+
+---
+
+### 2. Sin límite de intentos
+
+Los presupuestos de reintento siempre deben ser acotados. `loop-self-healing` enforcea `max_retries_per_file: 3` por default. Los valores pueden reducirse pero nunca configurarse como ilimitados.
+
+**Flag:** cualquier fase sin un límite `max_retries_per_*`.
+
+---
+
+### 3. Salida de triage vaga
+
+Cada worker en un plan debe tener un scope estrecho y explícito, una ruta de guardado y un rationale. Las frases de relleno genéricas están prohibidas.
+
+**Flag:** el plan contiene `"manejar apropiadamente"`, `"según sea necesario"`, `"si es relevante"`, o `"defaults razonables"`.
+
+---
+
+### 4. L3 antes de calidad L1
+
+El nivel de readiness debe coincidir con el historial de corridas del proyecto. L3 (desatendido) solo es apropiado para arquetipos de tickets que el plugin haya completado exitosamente antes.
+
+**Flag:** sin historial en `state.md` para este tipo de ticket, pero el plan solicita L3. Bajar a L1 y mostrar el motivo.
+
+---
+
+### 5. Estado compartido sin schema
+
+Dos fases nunca deben escribir a la misma ruta de artefacto sin un acuerdo de schema. Cada fase posee un archivo de salida distinto.
+
+**Flag:** rutas de artefactos duplicadas entre fases en el mismo plan.
+
+---
+
+### 6. MCP con alcance de escritura total
+
+La lista `tools` de cada worker debe ser el scope mínimo necesario para la tarea de ese worker. Los grants con wildcard (`*` o "all tools") están prohibidos.
+
+**Flag:** cualquier worker que declare un grant de herramientas con wildcard, o que solicite nuevos permisos MCP a mitad de corrida sin haberlos mostrado antes de la planificación.
+
+---
+
+### 7. Sin kill switch
+
+Cualquier plan con `readiness_level >= L2` o `estimated_cost_usd > $1.00` debe incluir un límite de presupuesto explícito y una compuerta de aprobación. El orchestrator también debe manejar SIGINT limpiamente para planes de menor costo.
+
+**Flag:** límite de presupuesto o umbral de compuerta faltante en el plan.
+
+---
+
+### 8. Arreglar flakes con código
+
+Un test que falla 1 de 3 ejecuciones es un flake, no un bug. `loop-self-healing` debe clasificar los fallos antes de reintentar. Los fallos inconsistentes persistentes se ponen en cuarentena y se escalan — no se parchean.
+
+**Flag:** la política de reintento carece de lógica de clasificación de flakes.
+
+---
+
+### 9. Auto-merge sin allowlist
+
+El plugin produce un branch y una PR description. Nunca ejecuta `git push --force`, `gh pr merge`, ni ningún comando equivalente a merge. Los grants de herramientas para todos los sub-agentes deben excluir capacidades de merge-on-main.
+
+**Flag:** cualquier grant de herramientas de sub-agente incluye `gh pr merge`, `git push origin main` o equivalente.
+
+---
+
+### 10. Sin run log
+
+Cada corrida debe agregar una entrada a `.loop/run-log.md`. El triage lo lee al inicio de cada corrida; el spec-writer lo agrega al final.
+
+**Flag:** la fase final del plan no incluye un paso `loop-state-append`.
+
+---
+
+## Cómo el triage maneja las coincidencias
+
+| Anti-patrón | Resolución |
+|---|---|
+| Auto-arreglable (ej. falta límite de reintento) | Corregir en el lugar y continuar |
+| Requiere criterio (ej. L3 sin historial) | Mostrar vía `AskUserQuestion` |
+| Sigue fallando después de 1 reintento | Emitir plan con warnings explícitos; el runtime decide |

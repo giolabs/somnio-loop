@@ -1,0 +1,89 @@
+# Ejemplos de configuración del loop
+
+Los tres presets mostrados como archivos `.loop/config.yaml` completos y listos para usar. Elegí uno y droppéalo en la raíz de tu repo.
+
+## Preset Minimal
+
+Autonomía total. El plugin solo se detiene ante eventos del safety floor (violaciones de reglas, detección de hotfix). Ideal para tickets repetitivos después de un período de calibración.
+
+```yaml
+# .loop/config.yaml
+autonomy:
+  preset: minimal   # El plugin procede en todas las compuertas excepto el safety floor.
+                    # Superaciones de presupuesto: ignoradas hasta el límite global.
+                    # Conflictos de ADR: registrados en el ADR, la corrida continúa.
+                    # Self-healing agotado: agregado al STATE, sin interrupción.
+                    # Gaps de spec: marcados como TBD, no se pregunta.
+                    # Creación de PR: PR draft abierto automáticamente.
+                    # Violaciones de reglas + hotfix: SIEMPRE preguntar (floor no configurable).
+```
+
+## Preset Ownership
+
+El humano posee las decisiones arquitectónicas y de riesgo; el plugin posee la ejecución rutinaria. Esperá 3–5 interacciones por ticket de desarrollo, en los momentos que importan.
+
+```yaml
+# .loop/config.yaml
+autonomy:
+  preset: ownership # Se consulta al humano para:
+                    #   - Conflictos de ADR con PRs abiertos (adr_conflict_gate → ask)
+                    #   - Self-healing agotado después de reintentos (self_healing_exhaust_gate → ask)
+                    #   - PR listo para crearse (pr_creation_gate → ask)
+                    #   - Violaciones de reglas + hotfix (safety floor — siempre preguntar)
+                    # El plugin procede autónomamente para:
+                    #   - Pequeños desvíos de presupuesto
+                    #   - Auto-fix del verifier para fallos de lint/type/test (2 reintentos)
+                    #   - Gaps de spec (marcados TBD)
+                    #   - Actualizaciones de status de tickets
+```
+
+## Preset Custom
+
+Definís cada compuerta explícitamente. Cada compuerta listada a continuación es requerida — el plugin rechaza configs custom parciales al arrancar.
+
+```yaml
+# .loop/config.yaml
+autonomy:
+  preset: custom    # TODAS las compuertas deben definirse. Falta alguna → error de arranque.
+
+gates:
+  budget_gate:
+    enabled: true
+    threshold_usd: 2.00       # Preguntar si el plan estima gastar más de $2.00.
+    threshold_tokens: 150000  # Preguntar si el plan estima más de 150k tokens.
+    on_exceed: ask            # ask | proceed | abort
+
+  verifier_blocking_gate:
+    enabled: true
+    on_blocking: auto_fix     # ask | auto_fix | proceed_with_warnings | abort
+    auto_fix_max_retries: 3   # 0–5. Valores > 5 se rechazan (prevención de loop infinito).
+
+  adr_conflict_gate:
+    enabled: true
+    on_high_conflict: ask     # ask | proceed_with_record | abort
+
+  adr_rule_violation_gate:
+    enabled: true
+    on_violation: ask         # ask | abort. "proceed" se RECHAZA — las reglas son no negociables.
+
+  spec_clarification_gate:
+    enabled: true
+    on_gaps: ask              # ask | use_defaults_and_flag | abort
+    max_questions: 3          # 0–20. Valores > 20 se rechazan (límite de fricción).
+
+  self_healing_exhaust_gate:
+    enabled: true
+    on_exhausted: ask         # ask | escalate_silent | abort
+
+  ticket_status_update_gate:
+    enabled: true
+    on_complete: proceed      # ask | proceed | proceed_with_record | skip
+
+  pr_creation_gate:
+    enabled: true
+    on_ready: ask             # ask | proceed (siempre draft) | skip
+
+  notification_gate:
+    enabled: true             # true | false
+    on_complete: proceed      # proceed | skip
+```

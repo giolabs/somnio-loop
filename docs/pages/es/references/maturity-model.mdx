@@ -1,0 +1,63 @@
+# Modelo de Madurez
+
+El agente de triage asigna un nivel de readiness a cada ticket. El nivel define qué hará y qué no hará el plugin durante esa corrida.
+
+## Los cuatro niveles
+
+| Nivel | Nombre | Qué hace | Qué no hace |
+|---|---|---|---|
+| **L0** | Draft | Produce un `plan.yml` y un reporte de intención de una página. Sin despacho de agentes más allá del triage. | Cualquier escritura a artefactos del usuario. |
+| **L1** | Report | Ejecuta fases de investigación, descubrimiento y auditoría. Lee código. Produce reportes de análisis. | Escrituras de código, specs, ADRs, operaciones git. |
+| **L2** | Assisted | Produce specs, ADRs y cambios de código en worktrees. Cada escritura pasa por una compuerta de aprobación antes de hacer commit. | Auto-mergear PRs o pushear a ramas protegidas. |
+| **L3** | Unattended | Autonomía total. Sin compuerta de aprobación. El self-healing converge sin input humano. | Auto-mergear PRs (nunca, ni siquiera L3). Escribir a rutas en denylist. |
+
+## Tabla de capacidades por nivel
+
+| Capacidad | L0 | L1 | L2 | L3 |
+|---|---|---|---|---|
+| Triage emite plan | sí | sí | sí | sí |
+| Despacho de sub-agentes | no | sí (solo investigación) | sí | sí |
+| Escritura de spec en `.planning/` | no | no | sí (después de aprobación) | sí |
+| Escritura de ADR en `docs/adr/` | no | no | sí (después de aprobación) | sí |
+| Workers escriben en rutas de código | no | no | sí (en worktree) | sí (en worktree) |
+| Reintentos de self-healing | no | no | sí (máx 3) | sí (máx 3) |
+| Escritura de PR description | no | no | sí | sí |
+| Append a `.loop/state.md` | sí | sí | sí | sí |
+| Append a `.loop/run-log.md` | sí | sí | sí | sí |
+| Tocar rutas en denylist | nunca | nunca | nunca | nunca |
+| Merge a main / ramas protegidas | nunca | nunca | nunca | nunca |
+
+## Rutas en denylist (todos los niveles)
+
+Estas rutas nunca se escriben, independientemente del nivel o la configuración de autonomía:
+
+- `.env`, `.env.*`
+- `secrets/`, `secret/`, `private/`
+- `infra/production/`, `terraform/production/`, `k8s/production/`
+- `.git/objects/`, `.git/hooks/`
+- Cualquier ruta que comience con `.ssh/`, `.aws/`, `.gcloud/`, `.kube/`
+
+## Cómo el triage asigna un nivel
+
+Las reglas se evalúan en orden; gana la primera coincidencia.
+
+| Regla | Resultado |
+|---|---|
+| El usuario solicitó explícitamente un nivel en el ticket | Respetar |
+| El ticket toca rutas en denylist | Limitar a L1 independientemente de la solicitud |
+| El run log muestra 3+ corridas exitosas de este arquetipo | Default L2 (o L3 si corridas previas se marcaron `success_no_review_needed`) |
+| El run log muestra 1+ corridas exitosas de este arquetipo | Default L2 con compuerta de aprobación |
+| Sin historial o menos de 1 corrida exitosa | Default L1 |
+| El ticket es puramente conversacional ("explicá X") | L0 — no se necesitan agentes |
+
+Después de elegir un nivel, el triage le dice al usuario qué nivel se eligió y por qué, y ofrece bajar vía `AskUserQuestion`. Subir requiere confirmación explícita.
+
+## Rollout recomendado
+
+| Período | Enfoque |
+|---|---|
+| Semana 1 | Correr todos los tickets en L1. Revisar artefactos manualmente. Construir confianza. |
+| Semana 2 | Para tipos de ticket revisados exitosamente dos veces, pasar a L2. |
+| Semana 3+ | Para tickets triviales recurrentes (rename, typo, archivo único), pasar a L3. |
+
+El plugin muestra los datos de `.loop/run-log.md` y hace recomendaciones. Vos decidís cuándo avanzar.

@@ -1,0 +1,58 @@
+# loop-self-healing
+
+## Descripción general
+
+`loop-self-healing` implementa el ciclo escribir → verificar → re-despachar para entregables de código. Cada worker escribe en un `git worktree` aislado, el runtime ejecuta los propios comandos de verificación del proyecto después de cada wave, y cualquier fallo dispara un despacho correctivo dirigido — solo para el archivo que apunta el error, con el stderr completo como contexto.
+
+## Cuándo se usa
+
+El triage selecciona este arquetipo cuando una fase necesita implementar archivos con criterios de aceptación ejecutables (el §8 del spec nombra los comandos de verificación). Es agnóstico al lenguaje: los comandos vienen del propio task runner del proyecto, no de suposiciones hardcodeadas. No es adecuado para entregables en prosa.
+
+## Entradas
+
+Un bloque de spec de fase del `plan.yml`:
+
+```yaml
+phase: implement
+archetype: self-healing
+spec_path: <repo_root>/.planning/phases/<slug>/spec.md
+api_contract_path: <repo_root>/.planning/phases/<slug>/api-contract.md
+repo_root: <ruta absoluta>
+files:
+  - path: src/utils/rate-limiter.ts
+    action: NUEVO
+    follow_example: src/utils/logger.ts
+    worker_id: w1
+  - path: src/middleware/rate-limit.ts
+    action: NUEVO
+    follow_example: src/middleware/auth.ts
+    worker_id: w2
+verification_commands:
+  - cmd: "npm run typecheck"
+    label: typecheck
+  - cmd: "npm test -- --testPathPattern=rate"
+    label: tests
+max_retries_per_file: 3
+```
+
+## Salidas
+
+| Salida | Ubicación |
+|---|---|
+| Archivos implementados | Branch `loop/<ticket_id>` (nunca pusheado) |
+| Reporte de self-healing | `<run_dir>/self-healing-report.md` |
+
+El reporte incluye una matriz de verificación mostrando el estado de cada comando por ronda correctiva, conteo de reintentos por archivo y estado de limpieza de worktrees.
+
+## Ejemplo
+
+```bash
+# El triage selecciona self-healing para:
+# "Implementar middleware de rate limiting — 100 req/min por API key"
+#
+# Wave 1: 2 workers escriben archivos en worktrees aislados
+# Merge → typecheck falla en rate-limiter.ts
+# Despacho correctivo: worker para rate-limiter.ts solo, con stderr adjunto
+# Re-merge → re-verificar → todo verde
+# Branch loop/TKT-421 creado
+```

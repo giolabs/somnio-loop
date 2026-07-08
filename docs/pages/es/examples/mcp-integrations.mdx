@@ -1,0 +1,86 @@
+# Ejemplos de integración MCP
+
+El plugin descubre las herramientas MCP en tiempo de ejecución vía `ToolSearch`. Estos bloques de configuración le indican qué proveedor preferir y cómo comportarse. Reemplazá cada placeholder con tus valores reales — nunca commitees credenciales reales.
+
+## Integración con Jira
+
+```yaml
+# .loop/config.yaml — bloque mcp_integrations (Jira + GitHub)
+mcp_integrations:
+  ticket_source:
+    type: jira
+    cloud_id: ""                                # Dejar en blanco para auto-descubrir via getAccessibleAtlassianResources.
+    project_key: "MYP"                          # Usado para filtros JQL y parseo de IDs de tickets.
+    required: false                             # Si true, el plugin aborta cuando Jira MCP no está disponible.
+    update_status_on_complete: true             # Establecer ticket en status_in_review después de una corrida exitosa.
+    status_in_progress: "In Progress"           # Nombre de status en Jira para "trabajo iniciado".
+    status_in_review: "In Review"               # Nombre de status en Jira para "PR creado". Nunca "Done".
+    custom_field_acceptance_criteria: "TU_CAMPO_AC_JIRA"  # ej. "customfield_10034"
+    comment_template: "default"                # O una ruta a un template .md dentro de tu repo.
+  pr_target:
+    type: github
+    owner: "tu-org"
+    repo: "tu-repo"
+    base_branch: "develop"
+    draft_default: true                         # Los PRs siempre se abren como drafts. Floor no configurable.
+    pr_template_path: ".github/pull_request_template.md"
+    github_account: ""                          # Usuario de gh CLI a usar si difiere de la cuenta activa.
+```
+
+Las credenciales (API key, Jira base URL, OAuth token) se configuran en los settings del servidor MCP de Claude Code — **no** en este archivo.
+
+## Integración con Linear
+
+```yaml
+# .loop/config.yaml — bloque mcp_integrations (Linear + GitHub)
+mcp_integrations:
+  ticket_source:
+    type: linear
+    project_key: "ENG"                          # Identificador del equipo Linear para filtrado de issues.
+    required: false
+    update_status_on_complete: true
+    status_in_progress: "In Progress"
+    status_in_review: "In Review"
+    comment_template: "default"
+  pr_target:
+    type: github
+    owner: "tu-org"
+    repo: "tu-repo"
+    base_branch: "main"
+    draft_default: true
+    pr_template_path: ".github/pull_request_template.md"
+  notification:
+    type: slack
+    channel: "#eng-loops"                       # Canal de Slack para postear resúmenes de corrida.
+    notify_on: [completed, partial, aborted]    # Tipos de evento que disparan una notificación.
+    summary_template: "default"
+```
+
+## Integración con GitHub
+
+```yaml
+# .loop/config.yaml — bloque mcp_integrations (GitHub Issues como fuente + GitHub PRs)
+mcp_integrations:
+  ticket_source:
+    type: github_issues
+    owner: "tu-org"                             # Org o usuario de GitHub que posee el repo.
+    repo: "tu-repo"                             # Repositorio donde viven los issues.
+    required: false
+    update_status_on_complete: true
+    status_in_review: "In Review"               # Aplicado como label — GitHub no tiene campo de status nativo.
+    comment_template: "default"
+  pr_target:
+    type: github
+    owner: "tu-org"
+    repo: "tu-repo"
+    base_branch: "develop"
+    draft_default: true
+    pr_template_path: ".github/pull_request_template.md"
+  notification:
+    type: slack
+    channel: "#deploys"
+    notify_on: [completed]
+    summary_template: "default"
+```
+
+El token de GitHub se configura en el servidor MCP de GitHub dentro de Claude Code. El token necesita scope `repo` para creación de PRs y lectura de issues.

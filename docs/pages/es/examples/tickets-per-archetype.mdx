@@ -1,0 +1,43 @@
+# Tickets por arquetipo
+
+El triage elige el arquetipo correcto automáticamente. Estos ejemplos muestran qué tipo de tickets dispara cada uno — copiá cualquiera de ellos verbatim.
+
+## Orchestrator-Workers
+
+Usá cuando el ticket tiene N sub-tareas independientes que pueden correr en paralelo y no dependen de la salida de las otras.
+
+```bash
+do "Investigar y comparar Vite, esbuild, Turbopack, Rollup y Parcel: tamaño de bundle, velocidad de HMR, soporte del ecosistema. Producir una tabla de comparación."
+```
+
+## Plan-Execute
+
+Usá cuando el ticket es un pipeline secuencial donde cada paso consume la salida del anterior.
+
+```bash
+do "Extraer todos los registros de usuarios del schema PostgreSQL legacy, transformarlos a la nueva forma UserProfile y cargarlos en la base de datos v2."
+```
+
+## Self-Healing
+
+Usá para cualquier ticket de escritura de código — los workers corren en git worktrees aislados, el verifier ejecuta lint/typecheck/tests, y los archivos que fallan se reintentan automáticamente (hasta 3 veces).
+
+```bash
+do "Implementar el EmailVerificationService: enviar token al registrarse, endpoint de verificación, lógica de expiración. Incluir tests unitarios."
+```
+
+## Generate-Spec
+
+Usá cuando el ticket implica un feature no trivial y querés un spec validado de 20 secciones antes de que se escriba cualquier código. El triage lo elige cuando detecta alcance de implementación sin criterios de aceptación suficientes.
+
+```bash
+do "Agregar autenticación multi-factor al flujo de login: TOTP y fallback por SMS. Generar spec antes de codificar."
+```
+
+## ADR
+
+Usá cuando el ticket contiene verbos arquitectónicos — *adoptar*, *migrar*, *reemplazar*, *introducir* — o propone una nueva tecnología, modelo de datos, diseño de API o cambio de infraestructura.
+
+```bash
+do "Adoptar Redis para caché de sesiones y reemplazar el store en memoria actual. Documentar la decisión con trade-offs."
+```

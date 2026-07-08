@@ -1,0 +1,127 @@
+# Comandos de Verificación Universales
+
+Esta referencia es usada por `worker-dev`, `verifier`, `loop-self-healing` y `spec-refiner` para encontrar los comandos que verifican código en un proyecto dado.
+
+## Orden de descubrimiento
+
+Los comandos se resuelven en orden de prioridad. Los niveles inferiores solo se usan cuando los niveles superiores no dan resultado.
+
+| Prioridad | Fuente | Cómo |
+|---|---|---|
+| 1 — Mayor | Task runner del proyecto | Leer `Makefile`, `justfile`, `Taskfile.yml`, `tasks.py`, `Rakefile`, aliases de `mix.exs`, `lefthook.yml` |
+| 2 | Sección de scripts del manifest | `package.json` → `scripts`, `pyproject.toml` → tool scripts, `composer.json` → `scripts` |
+| 3 — Fallback | Defaults idiomáticos por lenguaje | Tabla a continuación — solo cuando los pasos 1 y 2 no dan resultado |
+
+## Comandos de fallback por stack
+
+### TypeScript / JavaScript
+
+| Acción | npm | pnpm | yarn | bun |
+|---|---|---|---|---|
+| Typecheck | `npx tsc --noEmit` | `pnpm exec tsc --noEmit` | `yarn tsc --noEmit` | `bun x tsc --noEmit` |
+| Test | `npx jest` / `npx vitest run` | `pnpm test` | `yarn test` | `bun test` |
+| Lint | `npx eslint .` | `pnpm lint` | `yarn lint` | `bun lint` |
+| Build | `npx tsc` / `npx vite build` | `pnpm build` | `yarn build` | `bun run build` |
+
+### Python
+
+| Acción | Comando |
+|---|---|
+| Typecheck | `mypy <package>` / `pyright` |
+| Test | `pytest` / `nox` / `tox` |
+| Lint | `ruff check` / `flake8` / `pylint` |
+| Format check | `ruff format --check .` / `black --check .` |
+
+### Go
+
+| Acción | Comando |
+|---|---|
+| Build / Typecheck | `go build ./...` |
+| Test | `go test ./...` |
+| Lint | `golangci-lint run` / `go vet ./...` |
+| Format check | `gofmt -l .` |
+
+### Rust
+
+| Acción | Comando |
+|---|---|
+| Typecheck | `cargo check --all-targets` |
+| Test | `cargo test --all` |
+| Lint | `cargo clippy --all-targets -- -D warnings` |
+| Format check | `cargo fmt --check` |
+
+### Ruby
+
+| Acción | Comando |
+|---|---|
+| Test | `bundle exec rspec` |
+| Lint | `bundle exec rubocop` |
+
+### Java
+
+| Acción | Maven | Gradle |
+|---|---|---|
+| Test | `mvn test` | `./gradlew test` |
+| Lint | `mvn checkstyle:check` | `./gradlew checkstyleMain` |
+| Build | `mvn package` | `./gradlew build` |
+
+### Kotlin
+
+| Acción | Comando |
+|---|---|
+| Test | `./gradlew test` |
+| Lint | `./gradlew ktlintCheck` / `./gradlew detekt` |
+
+### .NET (C# / F#)
+
+| Acción | Comando |
+|---|---|
+| Test | `dotnet test` |
+| Lint | `dotnet format --verify-no-changes` |
+| Build | `dotnet build` |
+
+### Elixir
+
+| Acción | Comando |
+|---|---|
+| Test | `mix test` |
+| Lint | `mix credo --strict` |
+| Format check | `mix format --check-formatted` |
+| Build | `mix compile --warnings-as-errors` |
+
+### PHP
+
+| Acción | Comando |
+|---|---|
+| Test | `vendor/bin/phpunit` / `vendor/bin/pest` |
+| Lint | `vendor/bin/phpstan analyse` |
+| Format check | `vendor/bin/pint --test` |
+
+### Flutter / Dart
+
+| Acción | Comando |
+|---|---|
+| Test | `flutter test` / `dart test` |
+| Lint | `flutter analyze` / `dart analyze` |
+| Format check | `dart format --set-exit-if-changed .` |
+
+### Swift (iOS)
+
+| Acción | Comando |
+|---|---|
+| Test | `xcodebuild test -scheme <scheme> -destination '...'` / `swift test` |
+| Lint | `swiftlint lint` |
+| Format check | `swiftformat --lint .` |
+
+### Orquestadores de monorepo
+
+| Herramienta | Comando |
+|---|---|
+| Nx | `nx run-many --target=test --all` |
+| Turborepo | `turbo run test` |
+| pnpm workspace | `pnpm -r test` |
+| Bazel | `bazel test //...` |
+
+## Regla fija
+
+Al escribir el §8 del spec, siempre preferir los comandos del propio task runner o scripts del manifest del proyecto. La tabla de fallback es el último recurso para proyectos nuevos sin scripts configurados. Si incluso el fallback no aplica, marcar el §8 con `TBD — comandos de verificación faltantes; aclarar con el usuario antes de la implementación`.

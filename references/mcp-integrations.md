@@ -79,17 +79,27 @@ Atlassian's official Remote MCP exposes:
 
 **Plugin's ticket-fetch flow with Atlassian Remote:**
 
+**CRITICAL:** `getJiraIssue` requires a `cloudId` parameter that is NOT the Jira project key. You MUST resolve the cloudId before calling `getJiraIssue`. The plugin caches it in `config.yaml` to avoid the two-roundtrip cost on every run.
+
 ```
-1. Call getAccessibleAtlassianResources() → cache cloudId
-2. Call getJiraIssue(cloudId, "TKT-123") → returns issue with summary, description, customfields
-3. Parse:
+1. Check config.yaml for `mcp_integrations.ticket_source.cloud_id`.
+   → If non-empty: use the cached value. Skip to step 3.
+   → If blank: call getAccessibleAtlassianResources() to get the list of accessible sites.
+     Extract cloudId from the first returned site (or the one matching `project_key`).
+     Persist to config.yaml: `mcp_integrations.ticket_source.cloud_id: "<id>"`.
+     Surface: `☁️ Jira cloud ID cached to .loop/config.yaml (future runs will skip this step).`
+2. cloudId is now in memory.
+3. Call getJiraIssue(cloudId, "TKT-123") → returns issue with summary, description, customfields.
+4. Parse:
    - summary → ticket title
    - description → ticket body
    - customfield_*X* → acceptance criteria (if configured)
    - assignee → STATE Watch List owner
    - labels → archetype hints (e.g. "frontend", "ADR-needed")
-4. Synthesize into a single ticket_text string the same way the user would paste it manually
+5. Synthesize into a single ticket_text string the same way the user would paste it manually.
 ```
+
+**First run:** two roundtrips (getAccessibleAtlassianResources + getJiraIssue). All subsequent runs: one roundtrip (getJiraIssue with cached cloudId).
 
 **Status update at end of run** (gated):
 
@@ -154,6 +164,10 @@ mcp_integrations:
     base_branch: "main"              # default merge target
     draft_default: true
     pr_template_path: ".github/pull_request_template.md"
+    github_account: ""               # gh CLI username to switch to before PR creation
+                                     # e.g. "giosomniodev" — use when the active gh account
+                                     # differs from the org account that owns the repo.
+                                     # If blank, uses whatever account `gh auth status` reports.
 
   notification:
     type: slack | teams | discord | none
