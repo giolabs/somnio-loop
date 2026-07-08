@@ -18,16 +18,27 @@ The user's request will contain one or more tickets. Treat the ENTIRE user messa
 
 **Multi-ticket mode (v0.9.1):** If two or more ticket IDs (pattern `[A-Z]+-\d+` or `#\d+`) appear in the input, or the user says "run these tickets: [...]", activate multi-ticket mode:
 1. Surface a queue at Phase 0: `📋 Queue: MH-100 · MH-101 · MH-200 (3 tickets — sequential)`
-2. Run the full 8-phase loop for each ticket independently, in order. Each ticket gets its own run-log entry, trace, and plan archive.
+2. Run the full 8-phase loop for each ticket **completely and independently**, in order. Each ticket gets its own run-log entry, trace, plan archive, git branch, and PR.
 3. Append `--parallel` to the ticket text to dispatch ALL tickets concurrently via a single Agent tool message (only safe for independent, non-conflicting tickets — surface a warning if they share the same files or components).
 4. At the end, show a consolidated summary table:
 
 ```
-| Ticket | Status      | PR   | Duration | Cost  |
-|--------|-------------|------|----------|-------|
-| MH-100 | ✅ completed | #444 | 35m      | $0.80 |
-| MH-101 | ⚠️ partial   | —    | 12m      | $0.30 |
+| Ticket | Status      | Branch          | PR   | Duration | Cost  |
+|--------|-------------|-----------------|------|----------|-------|
+| MH-100 | ✅ completed | loop/MH-100     | #444 | 35m      | $0.80 |
+| MH-101 | ⚠️ partial   | loop/MH-101     | —    | 12m      | $0.30 |
 ```
+
+**CRITICAL — one branch and one PR per ticket, always:**
+
+This is the most common multi-ticket failure mode. Each ticket MUST be fully isolated:
+
+- Branch: `loop/<ticket_id>` — unique per ticket, created from the configured base branch
+- Workers: dispatched into `git worktree`s scoped to that ticket's branch only
+- PR: created (or not) based on the gate config for THAT ticket's run — NOT once for the whole multi-ticket batch
+- Artifacts: written to `/tmp/loop-runs/<ts>-<ticket_id>/` — separate directory per ticket
+
+**Never** allow workers from ticket A and ticket B to share a branch, a worktree, or an output directory. When running `--parallel`, each ticket's sub-agent receives its own isolated `workdir`, `branch`, and output path. The orchestrator owns the final summary table; each ticket's loop owns its own PR creation in Phase 7.
 
 ## Execution protocol
 

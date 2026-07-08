@@ -50,6 +50,29 @@ A run is not complete until **all** of the following are present. The orchestrat
 
 If the run must be delivered as `partial` (budget exhausted, max retries hit, unresolvable verifier findings), the orchestrator surfaces exactly what is present and what is missing, and adds the missing items to `state.md → High Priority` for the next run.
 
+## Multi-ticket: one branch and one PR per ticket
+
+When running multiple tickets (`do "MH-100 MH-101"` or `--parallel`), each ticket is **fully isolated**. This is the most common multi-ticket failure mode: workers from two tickets landing on the same branch and producing a merged PR that conflates unrelated changes.
+
+**The invariant:** one ticket → one branch → one PR. Always. No exceptions.
+
+| Scope | Isolated per ticket |
+|---|---|
+| Branch | `feature/MH-100-...` and `feature/MH-101-...` — created independently from the same base |
+| Worktrees | Each ticket gets its own `wt-<ticket_id>-<worker_n>` directories |
+| Output dir | `/tmp/loop-runs/<ts>-MH-100/` and `/tmp/loop-runs/<ts>-MH-101/` |
+| run-log entry | One entry per ticket |
+| PR creation | Phase 7 runs independently per ticket — NOT once for the whole batch |
+
+At the end the orchestrator shows a consolidated table with one PR URL per ticket:
+
+```
+| Ticket | Status      | Branch                    | PR   |
+|--------|-------------|---------------------------|------|
+| MH-100 | ✅ completed | feature/MH-100-add-cache  | #444 |
+| MH-101 | ✅ completed | feature/MH-101-fix-login  | #445 |
+```
+
 ## Example
 
 ```bash

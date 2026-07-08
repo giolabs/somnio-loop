@@ -272,6 +272,23 @@ In addition to the six existing safety floors, two new rules apply:
 7. **Hotfix detection always surfaces confirmation.** Even `autonomy: minimal` requires an explicit "continue" before creating a `hotfix/*` branch from main. Hotfixes touch production paths and warrant the extra friction.
 8. **The user's HEAD is invariant.** The plugin verifies before-and-after that `git rev-parse HEAD` and `git branch --show-current` are unchanged. If anything switched the user's checkout (a bug or a tool error), the run aborts with `INVARIANT VIOLATED` so the user can investigate before continuing.
 
+## Multi-ticket isolation rule (v0.9.2)
+
+When running multi-ticket mode (`do "MH-100 MH-101"` or `--parallel`), **each ticket is fully isolated**. This is the single most common multi-ticket failure mode: workers from two tickets landing on the same branch and producing a merged PR that conflates unrelated changes.
+
+**The invariant:** one ticket → one branch → one PR. Always. No exceptions.
+
+| Scope | Isolated per ticket |
+|---|---|
+| Branch | `feature/MH-100-...` and `feature/MH-101-...` — created independently from the same base |
+| Worktrees | Each ticket's workers get their own `wt-<ticket_id>-<worker_n>` directories |
+| Output dir | `/tmp/loop-runs/<ts>-MH-100/` and `/tmp/loop-runs/<ts>-MH-101/` |
+| run-log entry | One entry per ticket |
+| PR creation | Phase 7 runs independently per ticket — NOT once for the whole batch |
+| Summary table | The orchestrator collects one PR URL per ticket after all loops complete |
+
+When running `--parallel`, each ticket is dispatched as an independent sub-agent that receives its own `ticket_id`, `branch_name`, `workdir`, and output path. The orchestrator NEVER merges artifacts across tickets before PR creation.
+
 ## Backward compatibility
 
 If `git_flow.enabled: false` (or the section is missing), the v0.7.x behavior applies: a single `loop/<ticket_id>` branch, no ticket type classification, base branch is whatever HEAD points to. This is the simpler model for projects that don't use Git Flow.

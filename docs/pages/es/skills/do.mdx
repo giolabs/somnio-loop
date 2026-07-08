@@ -50,6 +50,29 @@ Una corrida no está completa hasta que **todos** los elementos siguientes esté
 
 Si la corrida debe entregarse como `partial` (presupuesto agotado, máximo de reintentos alcanzado, findings del verifier irresolubles), el orquestador muestra exactamente qué está presente y qué falta, y agrega los ítems faltantes a `state.md → High Priority` para la siguiente corrida.
 
+## Multi-ticket: un branch y un PR por ticket
+
+Cuando corrés múltiples tickets (`do "MH-100 MH-101"` o `--parallel`), cada ticket está **completamente aislado**. Este es el error más común en modo multi-ticket: workers de dos tickets distintos terminando en el mismo branch y generando un PR que mezcla cambios no relacionados.
+
+**El invariante:** un ticket → un branch → un PR. Siempre. Sin excepción.
+
+| Scope | Aislado por ticket |
+|---|---|
+| Branch | `feature/MH-100-...` y `feature/MH-101-...` — creados independientemente desde el mismo base |
+| Worktrees | Cada ticket tiene sus propios directorios `wt-<ticket_id>-<worker_n>` |
+| Directorio de output | `/tmp/loop-runs/<ts>-MH-100/` y `/tmp/loop-runs/<ts>-MH-101/` |
+| Entrada en run-log | Una entrada por ticket |
+| Creación de PR | La Phase 7 corre independientemente por ticket — NO una sola vez para el batch |
+
+Al final, el orquestador muestra una tabla consolidada con un PR URL por ticket:
+
+```
+| Ticket | Status      | Branch                    | PR   |
+|--------|-------------|---------------------------|------|
+| MH-100 | ✅ completed | feature/MH-100-add-cache  | #444 |
+| MH-101 | ✅ completed | feature/MH-101-fix-login  | #445 |
+```
+
 ## Ejemplo
 
 ```bash
